@@ -1,0 +1,57 @@
+{
+  "name": "mix/mix-skeleton",
+  "description": "Full-featured development skeleton",
+  "type": "project",
+  "keywords": [
+    "mix",
+    "skeleton"
+  ],
+  "homepage": "https://openmix.org/mix-php",
+  "license": "Apache-2.0",
+  "authors": [
+    {
+      "name": "liu,jian",
+      "email": "coder.keda@gmail.com"
+    }
+  ],
+  "require": {
+    "php": ">=7.2.0",
+    "ext-json": "*",
+    "ext-sockets": "*",
+    "ext-pdo": "*",
+    "mix/console": "~2.2.0",
+    "mix/bean": "~2.2.0",
+    "mix/event": "~2.2.0",
+    "mix/runtime": "~2.2.0",
+    "mix/helper": "~2.2.0",
+    "mix/monolog": "~2.2.0",
+    "mix/validate": "~2.2.0",
+    "mix/database": "~2.2.0",
+    "mix/redis": "~2.2.0",
+    "mix/redis-subscribe": "~2.2.0",
+    "mix/cache": "~2.2.0",
+    "mix/guzzle": "~2.2.0",
+    "mix/auth": "~2.2.0",
+    "mix/session": "~2.2.0",
+    "mix/fast-route": "~2.2.0",
+    "mix/view": "~2.2.0",
+    "mix/server": "~2.2.0",
+    "mix/http-server": "~2.2.0",
+    "mix/websocket": "~2.2.0",
+    "mix/sync-invoke": "~2.2.0",
+    "mix/worker-pool": "~2.2.0",
+    "symfony/dotenv": "~4.3",
+    "hassankhan/config": "^2.1"
+  },
+  "require-dev": {
+    "swoole/ide-helper": "dev-master"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "app/"
+    },
+    "files": [
+      "app/functions.php"
+    ]
+  }
+}
