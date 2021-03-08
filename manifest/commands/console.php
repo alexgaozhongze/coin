@@ -11,6 +11,19 @@ return [
         ],
     ],
 
+    'kline' => [
+        \App\Console\Commands\KlineCommand::class,
+        'usage'   => "\tKline",
+        'options' => [
+            [['s', 'symbol'], 'usage' => 'Symbol'],
+        ],
+    ],
+
+    'ticker' => [
+        \App\Console\Commands\TickerCommand::class,
+        'usage'   => "\tTicker",
+    ],
+
     'co' => [
         \App\Console\Commands\CoroutineCommand::class,
         'usage' => "\tCoroutine demo",
