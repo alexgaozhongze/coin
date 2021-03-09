@@ -11,6 +11,11 @@ return [
         ],
     ],
 
+    'account' => [
+        \App\Console\Commands\AccountCommand::class,
+        'usage'   => "\tAccount",
+    ],
+
     'kline' => [
         \App\Console\Commands\KlineCommand::class,
         'usage'   => "\tKline",

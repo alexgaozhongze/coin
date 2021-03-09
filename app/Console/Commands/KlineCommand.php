@@ -23,41 +23,53 @@ class KlineCommand
     public function main()
     {
         $redis = context()->get('redis');
-        $symbols = $redis->smembers('symbol:eth');
+        $symbols = $redis->smembers('symbol:usdt');
 
         $conn = $redis->borrow();
         $conn = null;
 
-        $chan = new Channel();
-        foreach ($symbols as $symbol) {
-            xgo([$this, 'handle'], $chan, $symbol);
+        while (true) {
+            $chan = new Channel();
+            foreach ($symbols as $symbol) {
+                xgo([$this, 'handle'], $chan, $symbol);
+            }
+
+            $list = [];
+            foreach ($symbols as $symbol) {
+                $result = $chan->pop();
+                $result && $list[] = $result;
+            }
+
+            $sort = array_column($list, 'up');
+            array_multisort($sort, SORT_ASC, $list);
+
+            if ($list) {
+                shellPrint($list);
+            }
         }
-
-        $list = [];
-        foreach ($symbols as $symbol) {
-            $result = $chan->pop();
-            $result && $list[] = $result;
-        }
-
-        $sort = array_column($list, 'up');
-        array_multisort($sort, SORT_ASC, $list);
-
-        shellPrint($list);
     }
 
     public function handle(Channel $chan, $symbol)
     {
         $client = new Client();
-        $response = $client->get("https://api.huobi.pro/market/history/kline?period=15min&size=1&symbol=$symbol")->getBody();
+        $response = $client->get("https://api.huobi.pro/market/history/kline?period=1min&size=1&symbol=$symbol")->getBody();
         $data = json_decode($response, true);
 
         $currentData = reset($data['data']);
-        $up = $currentData['close'] / $currentData['open'];
+        if ($currentData['close'] == $currentData['high']) {
+            $up = $currentData['close'] / $currentData['open'];
+            if (1.03 <= $up) {
+                $chan->push([
+                    'symbol' => $symbol,
+                    'up' => $up
+                ]);
+            } else {
+                $chan->push([]);
+            }
+        } else {
+            $chan->push([]);
+        }
 
-        $chan->push([
-            'symbol' => $symbol,
-            'up' => $up
-        ]);
     }
 
     private function formatData($response)
