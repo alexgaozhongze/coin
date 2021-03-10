@@ -87,7 +87,7 @@ class CoinModel
 		$this->api_method = '/v1/common/symbols';
 		$this->req_method = 'GET';
 		$url = $this->create_sign_url([]);
-		return json_decode($this->curl($url));
+		return json_decode($this->curl($url), true);
 	}
 	// 查询系统支持的所有币种
 	function get_common_currencys() {
@@ -168,7 +168,7 @@ class CoinModel
 		$this->req_method = 'GET';
 		$url = $this->create_sign_url();
 		$return = $this->curl($url);
-		return json_decode($return);
+		return json_decode($return, true);	
 	}
 	// 查询某个订单的成交明细
 	function get_order_matchresults($order_id = 0) {

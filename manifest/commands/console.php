@@ -2,6 +2,16 @@
 
 return [
 
+    'sell' => [
+        \App\Console\Commands\SellCommand::class,
+        'usage'   => "\tSell",
+    ],
+
+    'symbol' => [
+        \App\Console\Commands\SymbolCommand::class,
+        'usage'   => "\tSymbol",
+    ],
+
     'he' => [
         \App\Console\Commands\HelloCommand::class,
         'usage'   => "\tEcho demo",

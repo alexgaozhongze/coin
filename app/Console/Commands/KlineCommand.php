@@ -53,10 +53,20 @@ class KlineCommand
             if (1.06 <= $up) {
                 echo $symbol, ' ', $currentData['close'], ' ', $up, PHP_EOL;
                 $coin = new CoinModel();
-                $res = $coin->place_order(5, 0, $symbol, 'buy-market');
-                var_dump($res);
-                if ('ok' == $res->status) {
-                    $res = $coin->get_order($res->data);
+                $buyRes = $coin->place_order(5, 0, $symbol, 'buy-market');
+                var_dump($buyRes);
+                if ('ok' == $buyRes->status) {
+                    $orderId = $buyRes->data;
+                    $res = $coin->get_order($orderId);
+                    if ('ok' == $res['status']) {
+                        $amount = $res['data']['field-amount'] - $res['data']['field-fees'];
+                        
+                        $redis = context()->get('redis');
+                        $redis->set("sell:$symbol:$orderId", $amount);
+                
+                        $conn = $redis->borrow();
+                        $conn = null;
+                    }
                     var_dump($res);
                 }
             }
