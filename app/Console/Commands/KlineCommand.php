@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Models\CoinModel;
 use GuzzleHttp\Client;
 use Mix\Coroutine\Channel;
 
@@ -33,18 +34,9 @@ class KlineCommand
             foreach ($symbols as $symbol) {
                 xgo([$this, 'handle'], $chan, $symbol);
             }
-
-            $list = [];
+    
             foreach ($symbols as $symbol) {
-                $result = $chan->pop();
-                $result && $list[] = $result;
-            }
-
-            $sort = array_column($list, 'up');
-            array_multisort($sort, SORT_ASC, $list);
-
-            if ($list) {
-                shellPrint($list);
+                $chan->pop(6);
             }
         }
     }
@@ -52,24 +44,25 @@ class KlineCommand
     public function handle(Channel $chan, $symbol)
     {
         $client = new Client();
-        $response = $client->get("https://api.huobi.pro/market/history/kline?period=1min&size=1&symbol=$symbol")->getBody();
+        $response = $client->get("https://api.huobi.pro/market/history/kline?period=5min&size=1&symbol=$symbol")->getBody();
         $data = json_decode($response, true);
 
         $currentData = reset($data['data']);
         if ($currentData['close'] == $currentData['high']) {
             $up = $currentData['close'] / $currentData['open'];
-            if (1.03 <= $up) {
-                $chan->push([
-                    'symbol' => $symbol,
-                    'up' => $up
-                ]);
-            } else {
-                $chan->push([]);
+            if (1.06 <= $up) {
+                echo $symbol, ' ', $currentData['close'], ' ', $up, PHP_EOL;
+                $coin = new CoinModel();
+                $res = $coin->place_order(5, 0, $symbol, 'buy-market');
+                var_dump($res);
+                if ('ok' == $res->status) {
+                    $res = $coin->get_order($res->data);
+                    var_dump($res);
+                }
             }
-        } else {
-            $chan->push([]);
         }
 
+        $chan->push([]);
     }
 
     private function formatData($response)

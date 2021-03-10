@@ -121,13 +121,13 @@ class CoinModel
 	* 交易类API
 	*/
 	// 下单
-	function place_order($account_id=0,$amount=0,$price=0,$symbol='',$type='') {
+	function place_order($amount=0,$price=0,$symbol='',$type='') {
 		$source = 'api';
 		$this->api_method = "/v1/order/orders/place";
 		$this->req_method = 'POST';
 		// 数据参数
 		$postdata = [
-			'account-id' => $account_id,
+			'account-id' => config()['ACCOUNT_ID'],
 			'amount' => $amount,
 			'source' => $source,
 			'symbol' => $symbol,

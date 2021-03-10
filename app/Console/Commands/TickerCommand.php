@@ -23,7 +23,7 @@ class TickerCommand
 
         $client = new Client();
         $response = $client->get("https://api.huobi.pro/market/tickers")->getBody();
-        
+
         $data = json_decode($response, true);
         foreach ($data['data'] as $value) {
             if ($value['count']) {
