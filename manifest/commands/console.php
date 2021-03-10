@@ -2,6 +2,11 @@
 
 return [
 
+    'buy' => [
+        \App\Console\Commands\BuyCommand::class,
+        'usage'   => "\tBuy",
+    ],
+
     'sell' => [
         \App\Console\Commands\SellCommand::class,
         'usage'   => "\tSell",

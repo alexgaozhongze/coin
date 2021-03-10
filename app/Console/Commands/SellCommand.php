@@ -33,6 +33,8 @@ class SellCommand
             foreach ($sells as $sellKey) {
                 $chan->pop(6);
             }
+
+            sleep(1);
         }
     }
 
