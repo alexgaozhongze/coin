@@ -42,7 +42,7 @@ class BuyCommand
     public function handle(Channel $chan, $symbol)
     {
         $client = new Client();
-        $response = $client->get("https://api.huobi.pro/market/history/kline?period=1min&size=3&symbol=$symbol")->getBody();
+        $response = $client->get("https://api.huobi.pro/market/history/kline?period=1min&size=6&symbol=$symbol")->getBody();
         $data = json_decode($response, true);
 
         $currentData = reset($data['data']);
@@ -71,6 +71,7 @@ class BuyCommand
                     echo $buyRes->data, PHP_EOL;
                 } else {
                     echo $buyRes->{"err-msg"}, PHP_EOL;
+                    sleep(6);
                 }
             }
         }
