@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Console\Models\CoinModel;
-use GuzzleHttp\Client;
+use App\Console\Workers\SellWorker;
 use Mix\Coroutine\Channel;
+use Mix\WorkerPool\WorkerDispatcher;
 
 /**
  * Class SellCommand
@@ -18,59 +18,23 @@ class SellCommand
      */
     public function main()
     {
-        while (true) {
+        $maxWorkers = 6;
+        $maxQueue   = 3;
+        $maxWorkers = 1;
+        $maxQueue   = 1;
+        $jobQueue   = new Channel($maxQueue);
+        $dispatcher = new WorkerDispatcher($jobQueue, $maxWorkers, SellWorker::class);
+
+        xgo(function () use ($jobQueue, $dispatcher) {
+            // 投放任务
             $redis = context()->get('redis');
-            $sells = $redis->keys('sell*');
-    
-            $conn = $redis->borrow();
-            $conn = null;
-
-            $chan = new Channel();
-            foreach ($sells as $sellKey) {
-                xgo([$this, 'handle'], $chan, $sellKey);
+            while ($orderId = $redis->brpoplpush('buy:order', 'buy:order:check', 0)) {
+                $jobQueue->push($orderId);
             }
-    
-            foreach ($sells as $sellKey) {
-                $chan->pop(6);
-            }
+            // 停止
+            $dispatcher->stop();
+        });
 
-            sleep(1);
-        }
-    }
-
-    public function handle(Channel $chan, $sellKey)
-    {
-        list($sell, $symbol, $orderId) = explode(':', $sellKey);
-
-        $redis = context()->get('redis');
-        $amount = $redis->get($sellKey);
-
-        $client = new Client();
-        $response = $client->get("https://api.huobi.pro/market/history/kline?period=5min&size=1&symbol=$symbol")->getBody();
-        $data = json_decode($response, true);
-
-        $currentData = reset($data['data']);
-        $down = $currentData['high'] / $currentData['close'];
-        if (1.03 <= $down) {
-            $symbolInfo = $redis->hget('symbol', $symbol);
-            $symbolInfo = unserialize($symbolInfo);
-
-            list($int, $float) = explode('.', $amount);
-            $float = substr($float, 0, $symbolInfo['amount-precision']);
-            $amount = "$int.$float";
-
-            echo $symbol, ' ', $currentData['close'], ' ', $down, PHP_EOL;
-            $coin = new CoinModel();
-            $res = $coin->place_order($amount, 0, $symbol, 'sell-market');
-            var_dump($res);
-            if ('ok' == $res->status) {
-                $redis->del($sellKey);
-            }
-        }
-
-        $conn = $redis->borrow();
-        $conn = null;
-
-        $chan->push([]);
+        $dispatcher->run(); // 阻塞代码，直到任务全部执行完成并且全部 Worker 停止
     }
 }

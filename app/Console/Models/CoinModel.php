@@ -168,7 +168,7 @@ class CoinModel
 		$this->req_method = 'GET';
 		$url = $this->create_sign_url();
 		$return = $this->curl($url);
-		return json_decode($return, true);	
+		return json_decode($return);	
 	}
 	// 查询某个订单的成交明细
 	function get_order_matchresults($order_id = 0) {

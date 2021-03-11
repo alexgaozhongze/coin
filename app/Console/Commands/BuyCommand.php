@@ -22,10 +22,11 @@ class BuyCommand
         while (true) {
             $redis = context()->get('redis');
             $symbols = $redis->get('symbol:usdt');
-            $symbols = unserialize($symbols);
-    
+
             $conn = $redis->borrow();
             $conn = null;
+
+            $symbols = unserialize($symbols);
 
             $chan = new Channel();
             foreach ($symbols as $symbol) {
@@ -41,29 +42,40 @@ class BuyCommand
     public function handle(Channel $chan, $symbol)
     {
         $client = new Client();
-        $response = $client->get("https://api.huobi.pro/market/history/kline?period=5min&size=1&symbol=$symbol")->getBody();
+        $response = $client->get("https://api.huobi.pro/market/history/kline?period=1min&size=3&symbol=$symbol")->getBody();
         $data = json_decode($response, true);
 
         $currentData = reset($data['data']);
         if ($currentData['close'] == $currentData['high']) {
-            $up = $currentData['close'] / $currentData['open'];
-            if (1.06 <= $up) {
-                echo $symbol, ' ', $currentData['close'], ' ', $up, PHP_EOL;
+            $low = end($data['data'])['low'];
+            foreach ($data['data'] as $key => $value) {
+                $key && $low >= $value['low'] && $low = $value['low'];
+            }
+
+            $up = $currentData['close'] / $low;
+            if (1.03 <= $up) {
+                echo date('Y-m-d H:i:s'), PHP_EOL;
+                echo $symbol, ' ', $low, ' ', $currentData['close'], ' ', $up, PHP_EOL;
                 $coin = new CoinModel();
                 $buyRes = $coin->place_order(5, 0, $symbol, 'buy-market');
-                var_dump($buyRes);
                 if ('ok' == $buyRes->status) {
                     $orderId = $buyRes->data;
-                    $res = $coin->get_order($orderId);
-                    if ('ok' == $res['status']) {
-                        $amount = $res['data']['field-amount'] - $res['data']['field-fees'];
+
+                    $redis = context()->get('redis');
+                    $redis->lpush("buy:order", $orderId);
+            
+                    $conn = $redis->borrow();
+                    $conn = null;
+
+                    // $res = $coin->get_order($orderId);
+                    // if ('ok' == $res['status']) {
+                    //     $amount = $res['data']['field-amount'] - $res['data']['field-fees'];
                         
-                        $redis = context()->get('redis');
-                        $redis->set("sell:$symbol:$orderId", $amount);
-                
-                        $conn = $redis->borrow();
-                        $conn = null;
-                    }
+
+                    // }
+                    echo $buyRes->data, PHP_EOL;
+                } else {
+                    echo $buyRes->{"err-msg"}, PHP_EOL;
                 }
             }
         }
