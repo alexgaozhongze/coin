@@ -42,15 +42,19 @@ class BuyCommand
     public function handle(Channel $chan, $symbol)
     {
         $client = new Client();
-        $response = $client->get("https://api.huobi.pro/market/history/kline?period=1min&size=6&symbol=$symbol")->getBody();
+        $response = $client->get("https://api.huobi.pro/market/history/kline?period=1min&size=3&symbol=$symbol")->getBody();
         $data = json_decode($response, true);
 
+        $allUp = true;
+        foreach ($data['data'] as $value) {
+            $value['close'] <= $value['open'] && $allUp = false;
+        }
+
         $currentData = reset($data['data']);
-        if ($currentData['close'] == $currentData['high']) {
-            $low = $currentData['open'];
+        if ($allUp) {
+            $low = $currentData['low'];
             foreach ($data['data'] as $value) {
-                $low >= $value['open'] && $low = $value['open'];
-                $low >= $value['close'] && $low = $value['close'];
+                $low >= $value['low'] && $low = $value['low'];
             }
 
             $up = $currentData['close'] / $low;

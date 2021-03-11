@@ -29,19 +29,21 @@ class SellWorker extends AbstractWorker
     {
         $coin = new CoinModel();
         $order = $coin->get_order($orderId);
-        echo date('Y-m-d H:i:s'), PHP_EOL;
         if ('ok' == $order->status) {
             $orderInfo = $order->data;
             $symbol = $orderInfo->symbol;
             $amount = $orderInfo->{"field-amount"} - $orderInfo->{"field-fees"};
             $createAt = $orderInfo->{"created-at"};
 
+            echo date('Y-m-d H:i:s'), ' ', $symbol, PHP_EOL;
+
             $sell = false;
             while (!$sell) {
                 $kLine = $coin->get_history_kline($symbol, '1min', 2);
                 $prevKLine = end($kLine->data);
                 $curKLine = reset($kLine->data);
-                if ($prevKLine->open > $prevKLine->close && $curKLine->close >= $amount) {
+
+                if ($prevKLine->open > $prevKLine->close) {
                     $redis = context()->get('redis');
                     $symbolInfo = $redis->hget('symbol', $symbol);
     
@@ -58,7 +60,7 @@ class SellWorker extends AbstractWorker
                     $res = $coin->place_order($amount, 0, $symbol, 'sell-market');
                     var_dump($res);
                     $sell = true;
-                } elseif (1863 <= time() - $createAt / 1000 && $curKLine->close == $curKLine->high) {
+                } elseif (666 <= time() - $createAt / 1000 && $curKLine->close == $curKLine->high) {
                     $redis = context()->get('redis');
                     $symbolInfo = $redis->hget('symbol', $symbol);
 
