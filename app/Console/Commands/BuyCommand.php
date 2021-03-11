@@ -47,9 +47,10 @@ class BuyCommand
 
         $currentData = reset($data['data']);
         if ($currentData['close'] == $currentData['high']) {
-            $low = end($data['data'])['low'];
-            foreach ($data['data'] as $key => $value) {
-                $key && $low >= $value['low'] && $low = $value['low'];
+            $low = $currentData['open'];
+            foreach ($data['data'] as $value) {
+                $low >= $value['open'] && $low = $value['open'];
+                $low >= $value['close'] && $low = $value['close'];
             }
 
             $up = $currentData['close'] / $low;
@@ -67,12 +68,6 @@ class BuyCommand
                     $conn = $redis->borrow();
                     $conn = null;
 
-                    // $res = $coin->get_order($orderId);
-                    // if ('ok' == $res['status']) {
-                    //     $amount = $res['data']['field-amount'] - $res['data']['field-fees'];
-                        
-
-                    // }
                     echo $buyRes->data, PHP_EOL;
                 } else {
                     echo $buyRes->{"err-msg"}, PHP_EOL;

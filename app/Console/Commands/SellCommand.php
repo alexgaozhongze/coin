@@ -20,8 +20,6 @@ class SellCommand
     {
         $maxWorkers = 6;
         $maxQueue   = 3;
-        $maxWorkers = 1;
-        $maxQueue   = 1;
         $jobQueue   = new Channel($maxQueue);
         $dispatcher = new WorkerDispatcher($jobQueue, $maxWorkers, SellWorker::class);
 

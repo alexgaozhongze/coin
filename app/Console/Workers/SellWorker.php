@@ -58,7 +58,7 @@ class SellWorker extends AbstractWorker
                     $res = $coin->place_order($amount, 0, $symbol, 'sell-market');
                     var_dump($res);
                     $sell = true;
-                } elseif (666 <= time() - $createAt / 1000 && $curKLine->close = $curKLine->high) {
+                } elseif (666 <= time() - $createAt / 1000 && $curKLine->close == $curKLine->high) {
                     $redis = context()->get('redis');
                     $symbolInfo = $redis->hget('symbol', $symbol);
 
