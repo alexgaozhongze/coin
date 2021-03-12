@@ -32,35 +32,33 @@ class SellWorker extends AbstractWorker
         $order = $coin->get_order($orderId);
         if ('ok' == $order->status) {
             $orderInfo = $order->data;
+            while ('filled' != $orderInfo->state) {
+                $order = $coin->get_order($orderId);
+                $orderInfo = $order->data;
+            }
+
             $symbol = $orderInfo->symbol;
 
             $sell = false;
             while (!$sell) {
-                $client = new Client();
-                $response = $client->get("https://api.huobi.pro/market/history/kline?period=1min&size=36&symbol=$symbol")->getBody();
-                $symbolRes = json_decode($response, true);
-                $symbolList = $symbolRes['data'];
-        
+                $symbolRes = $coin->get_history_kline($symbol, '1min', 6);
+                $symbolList = $symbolRes->data;
+
                 $symbolList = array_reverse($symbolList);
                 foreach ($symbolList as $key => $value) {
                     if ($key) {
-                        $value['ema3']  = 2 / (3  + 1) * $value['close'] + (3  - 1) / (3  + 1) * $symbolList[$key - 1]['ema3'];
-                        $value['ema6']  = 2 / (6  + 1) * $value['close'] + (6  - 1) / (6  + 1) * $symbolList[$key - 1]['ema6'];
-                        $value['ema9']  = 2 / (9  + 1) * $value['close'] + (9  - 1) / (9  + 1) * $symbolList[$key - 1]['ema9'];
-                        $value['ema36'] = 2 / (36 + 1) * $value['close'] + (36 - 1) / (36 + 1) * $symbolList[$key - 1]['ema36'];
+                        $value->ema3  = 2 / (3  + 1) * $value->close + (3  - 1) / (3  + 1) * $symbolList[$key - 1]->ema3;
                     } else {
-                        $value['ema3'] = $value['close'];
-                        $value['ema6'] = $value['close'];
-                        $value['ema9'] = $value['close'];
-                        $value['ema36'] = $value['close'];
+                        $value->ema3 = $value->close;
                     }
         
                     $symbolList[$key] = $value;
                 }
         
                 $currentData = end($symbolList);
-                if ($currentData['ema3'] < $currentData['ema6'] && $currentData['ema3'] < $currentData['ema9']) {
-                    echo $symbol, ' ', $currentData['close'], ' ', date('Y-m-d H:i:s'), PHP_EOL;
+                $prevData = prev($symbolList);
+                if ($currentData->ema3 < $prevData->ema3) {
+                    echo $symbol, ' ', $currentData->close, ' ', date('Y-m-d H:i:s'), PHP_EOL;
 
                     $amount = $orderInfo->{"field-amount"} - $orderInfo->{"field-fees"};
 
@@ -71,8 +69,12 @@ class SellWorker extends AbstractWorker
                     list($int, $float) = explode('.', $amount);
                     $float = substr($float, 0, $symbolInfo['amount-precision']);
                     $amount = "$int.$float";
+
+                    list($int, $float) = explode('.', $currentData->ema3);
+                    $float = substr($float, 0, $symbolInfo['price-precision']);
+                    $price = "$int.$float";
         
-                    $sellRes = $coin->place_order($amount, 0, $symbol, 'sell-market');
+                    $sellRes = $coin->place_order($amount, $price, $symbol, 'sell-limit');
                     if ('ok' == $sellRes->status) {
                         echo $sellRes->data, PHP_EOL;
 

@@ -42,7 +42,7 @@ class BuyCommand
     public function handle(Channel $chan, $symbol)
     {
         $client = new Client();
-        $response = $client->get("https://api.huobi.pro/market/history/kline?period=1min&size=36&symbol=$symbol")->getBody();
+        $response = $client->get("https://api.huobi.pro/market/history/kline?period=1min&size=6&symbol=$symbol")->getBody();
         $symbolRes = json_decode($response, true);
         $symbolList = $symbolRes['data'];
 
@@ -50,39 +50,40 @@ class BuyCommand
         foreach ($symbolList as $key => $value) {
             if ($key) {
                 $value['ema3']  = 2 / (3  + 1) * $value['close'] + (3  - 1) / (3  + 1) * $symbolList[$key - 1]['ema3'];
-                $value['ema6']  = 2 / (6  + 1) * $value['close'] + (6  - 1) / (6  + 1) * $symbolList[$key - 1]['ema6'];
-                $value['ema9']  = 2 / (9  + 1) * $value['close'] + (9  - 1) / (9  + 1) * $symbolList[$key - 1]['ema9'];
             } else {
                 $value['ema3'] = $value['close'];
-                $value['ema6'] = $value['close'];
-                $value['ema9'] = $value['close'];
             }
 
             $symbolList[$key] = $value;
         }
 
-        $allUp = true;
         $currentData = end($symbolList);
-        for ($i = 0; $i < 6; $i ++) {
-            $current = current($symbolList);
-            $prev = prev($symbolList);
-            if ($current['open'] >= $prev['open'] || $current['close'] >= $prev['close'] || $current['high'] >= $prev['high'] || $current['low'] >= $prev['low']) {
-                continue;
-            }
-
-            $allUp = false;
-        }
-
-        $macdAllUp = false;
-        $currentData['ema3'] >= $currentData['ema6'] && $currentData['ema6'] >= $currentData['ema9'] && $macdAllUp = true;
-
-        if ($allUp && $macdAllUp) {
+        $prevData = prev($symbolList);
+        if (1.01 <= $currentData['ema3'] / $prevData['ema3']) {
             $redis = context()->get('redis');
             if ($redis->setnx("$symbol:lock", null)) {
-                echo $symbol, ' ', $currentData['close'], ' ', date('Y-m-d H:i:s'), PHP_EOL;
+                echo $symbol, ' ';
+
+                $symbolInfo = $redis->hget('symbol', $symbol);
+                $symbolInfo = unserialize($symbolInfo);
+
+                list($int, $float) = explode('.', $currentData['ema3']);
+                $float = substr($float, 0, $symbolInfo['price-precision']);
+                $price = "$int.$float";
+
+                $amount = $symbolInfo['min-order-value'] / $price;
+                $mul = 1;
+                for ($i = 0; $i < $symbolInfo['amount-precision']; $i ++) {
+                    $mul *= 10;
+                }
+                $amount *= $mul;
+                $amount = ceil($amount);
+                $amount /= $mul;
+
+                echo $price, ' ', $amount, ' ', date('Y-m-d H:i:s', strtotime("+8 hours")), PHP_EOL;
 
                 $coin = new CoinModel();
-                $buyRes = $coin->place_order(5, 0, $symbol, 'buy-market');
+                $buyRes = $coin->place_order($amount, $price, $symbol, 'buy-limit');
                 if ('ok' == $buyRes->status) {
                     $orderId = $buyRes->data;
 
@@ -90,7 +91,6 @@ class BuyCommand
                     $redis->setex("$symbol:lock", 666, null);
 
                     echo $buyRes->data, PHP_EOL;
-
                 } else {
                     $redis->setex("$symbol:lock", 333, null);
 

@@ -26,6 +26,7 @@ class SellCommand
         xgo(function () use ($jobQueue, $dispatcher) {
             // 投放任务
             $redis = context()->get('redis');
+            // $jobQueue->push('231735586496578');
             while ($orderId = $redis->brpoplpush('buy:order', 'buy:order:check', 0)) {
                 $jobQueue->push($orderId);
             }
