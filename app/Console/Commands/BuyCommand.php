@@ -28,6 +28,8 @@ class BuyCommand
 
             $symbols = unserialize($symbols);
 
+            $symbols = ['socusdt'];
+
             $chan = new Channel();
             foreach ($symbols as $symbol) {
                 xgo([$this, 'handle'], $chan, $symbol);
@@ -58,8 +60,38 @@ class BuyCommand
         }
 
         $currentData = end($symbolList);
+        $prev = prev($symbolList);
+        $prev = prev($symbolList);
+
+        var_dump($prev);die;
+
+
+
+        $prevUp = 0;
+        $curveUp = true;
+        for ($i = 0; $i < 3; $i ++) {
+            $curr = current($symbolList);
+            $prev = prev($symbolList);
+
+
+            if ($curr->ema3 <= $prev->ema3) {
+                $curveUp = false;
+                break;
+            }
+
+            $currUp = $curr->ema3 / $prev->ema3;
+            if ($i) {
+                if ($currUp <= $prevUp) {
+                    $curveUp = false;
+                    break;
+                }
+            }
+            $prevUp = $currUp;
+        }
+
         $prevData = prev($symbolList);
-        if (1.01 <= $currentData['ema3'] / $prevData['ema3']) {
+        // if (1.01 <= $currentData['ema3'] / $prevData['ema3']) {
+        if ($curveUp) {
             $redis = context()->get('redis');
             if ($redis->setnx("$symbol:lock", null)) {
                 echo $symbol, ' ';

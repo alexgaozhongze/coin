@@ -33,6 +33,7 @@ class SellWorker extends AbstractWorker
         if ('ok' == $order->status) {
             $orderInfo = $order->data;
             while ('filled' != $orderInfo->state) {
+                sleep(1);
                 $order = $coin->get_order($orderId);
                 $orderInfo = $order->data;
             }
@@ -76,10 +77,20 @@ class SellWorker extends AbstractWorker
         
                     $sellRes = $coin->place_order($amount, $price, $symbol, 'sell-limit');
                     if ('ok' == $sellRes->status) {
-                        echo $sellRes->data, PHP_EOL;
+                        echo 'limit', ' ', $sellRes->data, PHP_EOL;
 
                         $redis->del("$symbol:lock");
                         $sell = true;
+                    } elseif ('order-value-min-error' == $sellRes->{"err-code"}) {
+                        $sellRes = $coin->place_order($amount, 0, $symbol, 'sell-market');
+                        if ('ok' == $sellRes->status) {
+                            echo 'market', ' ', $sellRes->data, PHP_EOL;
+    
+                            $redis->del("$symbol:lock");
+                            $sell = true;
+                        } else {
+                            echo $sellRes->{"err-msg"}, PHP_EOL;
+                        }
                     } else {
                         echo $sellRes->{"err-msg"}, PHP_EOL;
                     }
