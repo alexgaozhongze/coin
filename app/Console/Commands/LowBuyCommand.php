@@ -51,7 +51,7 @@ class LowBuyCommand
         $symbolList = $symbolRes->data;
 
         $currentData = reset($symbolList);
-        if ($currentData->close != $currentData->low) return false;
+        if ($currentData->close >= $currentData->open) return false;
 
         $prevData = next($symbolList);
         $prevMax = $prevData->high;
