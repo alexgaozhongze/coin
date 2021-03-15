@@ -18,7 +18,7 @@ class SellCommand
      */
     public function main()
     {
-        $maxWorkers = 6;
+        $maxWorkers = 6; 
         $maxQueue   = 3;
         $jobQueue   = new Channel($maxQueue);
         $dispatcher = new WorkerDispatcher($jobQueue, $maxWorkers, SellWorker::class);
@@ -26,7 +26,7 @@ class SellCommand
         xgo(function () use ($jobQueue, $dispatcher) {
             // 投放任务
             $redis = context()->get('redis');
-            $jobQueue->push('231735737385318');
+            // $jobQueue->push(232116313656287);
             while ($orderId = $redis->brpoplpush('buy:order', 'buy:order:check', 0)) {
                 $jobQueue->push($orderId);
             }

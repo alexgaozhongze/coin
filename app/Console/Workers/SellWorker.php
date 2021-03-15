@@ -28,12 +28,18 @@ class SellWorker extends AbstractWorker
      */
     public function do($orderId)
     {
+        echo $orderId , " start", PHP_EOL;
+
         $coin = new CoinModel();
         $order = $coin->get_order($orderId);
+        while (!$order) {
+            sleep(6);
+            $order = $coin->get_order($orderId);
+        }
         if ('ok' == $order->status) {
             $orderInfo = $order->data;
             while ('filled' != $orderInfo->state) {
-                sleep(1);
+                sleep(6);
                 $order = $coin->get_order($orderId);
                 $orderInfo = $order->data;
             }
@@ -42,24 +48,25 @@ class SellWorker extends AbstractWorker
 
             $sell = false;
             while (!$sell) {
-                $symbolRes = $coin->get_history_kline($symbol, '1min', 6);
+                $symbolRes = $coin->get_history_kline($symbol, '1min', 3);
+                while (!$symbolRes || 3 != count($symbolRes->data)) {
+                    sleep(6);
+                    $symbolRes = $coin->get_history_kline($symbol, '1min', 3);
+                }
                 $symbolList = $symbolRes->data;
 
-                $symbolList = array_reverse($symbolList);
+                $currentData = reset($symbolList);
+
+                $allDown = true;
+                $isMinLow = true;
                 foreach ($symbolList as $key => $value) {
-                    if ($key) {
-                        $value->ema3  = 2 / (3  + 1) * $value->close + (3  - 1) / (3  + 1) * $symbolList[$key - 1]->ema3;
-                    } else {
-                        $value->ema3 = $value->close;
-                    }
-        
-                    $symbolList[$key] = $value;
+                    isset($symbolList[$key + 1]) && $symbolList[$key + 1]->close < $value->close && $allDown = false;
+                    $key && $value->low < $currentData->low && $isMinLow = false;
                 }
-        
-                $currentData = end($symbolList);
-                $prevData = prev($symbolList);
-                if ($currentData->ema3 < $prevData->ema3) {
-                    echo $symbol, ' ', $currentData->close, ' ', date('Y-m-d H:i:s'), PHP_EOL;
+
+                if ($allDown && $isMinLow) {
+                    echo $symbol, ' ', $currentData->close, ' ', date('Y-m-d H:i:s', strtotime("+8 hours")), PHP_EOL;
+                    echo "order $orderId", PHP_EOL;
 
                     $amount = $orderInfo->{"field-amount"} - $orderInfo->{"field-fees"};
 
@@ -71,7 +78,9 @@ class SellWorker extends AbstractWorker
                     $float = substr($float, 0, $symbolInfo['amount-precision']);
                     $amount = "$int.$float";
 
-                    list($int, $float) = explode('.', $currentData->ema3);
+                    $price = $currentData->close;
+                    $price < $orderInfo->price * 1.03 && $price = $orderInfo->price * 1.03;
+                    list($int, $float) = explode('.', $price);
                     $float = substr($float, 0, $symbolInfo['price-precision']);
                     $price = "$int.$float";
         
@@ -79,14 +88,14 @@ class SellWorker extends AbstractWorker
                     if ('ok' == $sellRes->status) {
                         echo 'limit', ' ', $sellRes->data, PHP_EOL;
 
-                        $redis->del("$symbol:lock");
+                        $redis->setex("$symbol:lock", 6, null);
                         $sell = true;
                     } elseif ('order-value-min-error' == $sellRes->{"err-code"}) {
                         $sellRes = $coin->place_order($amount, 0, $symbol, 'sell-market');
                         if ('ok' == $sellRes->status) {
                             echo 'market', ' ', $sellRes->data, PHP_EOL;
     
-                            $redis->del("$symbol:lock");
+                            $redis->setex("$symbol:lock", 6, null);
                             $sell = true;
                         } else {
                             echo $sellRes->{"err-msg"}, PHP_EOL;

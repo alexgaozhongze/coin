@@ -2,6 +2,8 @@
 
 namespace App\Console\Models;
 
+use GuzzleHttp\Client;
+
 class CoinModel 
 {
 	private $url = 'https://api.huobi.pro';
@@ -377,6 +379,21 @@ class CoinModel
 		return base64_encode($signature);
 	}
 	function curl($url,$postdata=[]) {
+		$client = new Client();
+
+		$params = [];
+		'POST' == $this->req_method && $params = ['json' => $postdata];
+
+		$res = $client->request($this->req_method, $url, $params);
+		while (200 != $res->getStatusCode()) {
+			sleep(6);
+			$res = $client->request($this->req_method, $url, $params);
+		}
+
+		return $res->getBody();
+
+
+
 		$ch = curl_init();
 		curl_setopt($ch,CURLOPT_URL, $url);
 		if ($this->req_method == 'POST') {

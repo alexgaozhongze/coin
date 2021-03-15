@@ -3,8 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Console\Models\CoinModel;
-use GuzzleHttp\Client;
 use Mix\Coroutine\Channel;
+use Mix\Time\Time;
 
 /**
  * Class BuyCommand
@@ -28,8 +28,6 @@ class BuyCommand
 
             $symbols = unserialize($symbols);
 
-            $symbols = ['socusdt'];
-
             $chan = new Channel();
             foreach ($symbols as $symbol) {
                 xgo([$this, 'handle'], $chan, $symbol);
@@ -43,55 +41,24 @@ class BuyCommand
 
     public function handle(Channel $chan, $symbol)
     {
-        $client = new Client();
-        $response = $client->get("https://api.huobi.pro/market/history/kline?period=1min&size=6&symbol=$symbol")->getBody();
-        $symbolRes = json_decode($response, true);
-        $symbolList = $symbolRes['data'];
+        $coin = new CoinModel();
+        $symbolRes = $coin->get_history_kline($symbol, '1min', 9);
+        $symbolList = $symbolRes->data;
 
-        $symbolList = array_reverse($symbolList);
+        $allHasUp = true;
         foreach ($symbolList as $key => $value) {
-            if ($key) {
-                $value['ema3']  = 2 / (3  + 1) * $value['close'] + (3  - 1) / (3  + 1) * $symbolList[$key - 1]['ema3'];
-            } else {
-                $value['ema3'] = $value['close'];
+            if (!isset($symbolList[$key + 1])) break;
+            $prev = $symbolList[$key + 1];
+            $hasUp = false;
+            if ($value->close >= $prev->low) {
+                $hasUp = true;
             }
-
-            $symbolList[$key] = $value;
+            !$hasUp && $allHasUp = false;
         }
 
-        $currentData = end($symbolList);
-        $prev = prev($symbolList);
-        $prev = prev($symbolList);
-
-        var_dump($prev);die;
-
-
-
-        $prevUp = 0;
-        $curveUp = true;
-        for ($i = 0; $i < 3; $i ++) {
-            $curr = current($symbolList);
-            $prev = prev($symbolList);
-
-
-            if ($curr->ema3 <= $prev->ema3) {
-                $curveUp = false;
-                break;
-            }
-
-            $currUp = $curr->ema3 / $prev->ema3;
-            if ($i) {
-                if ($currUp <= $prevUp) {
-                    $curveUp = false;
-                    break;
-                }
-            }
-            $prevUp = $currUp;
-        }
-
-        $prevData = prev($symbolList);
-        // if (1.01 <= $currentData['ema3'] / $prevData['ema3']) {
-        if ($curveUp) {
+        $currentData = reset($symbolList);
+        
+        if ($allHasUp) {
             $redis = context()->get('redis');
             if ($redis->setnx("$symbol:lock", null)) {
                 echo $symbol, ' ';
@@ -99,7 +66,7 @@ class BuyCommand
                 $symbolInfo = $redis->hget('symbol', $symbol);
                 $symbolInfo = unserialize($symbolInfo);
 
-                list($int, $float) = explode('.', $currentData['ema3']);
+                list($int, $float) = explode('.', $currentData->close);
                 $float = substr($float, 0, $symbolInfo['price-precision']);
                 $price = "$int.$float";
 
@@ -119,12 +86,22 @@ class BuyCommand
                 if ('ok' == $buyRes->status) {
                     $orderId = $buyRes->data;
 
-                    $redis->lpush("buy:order", $orderId);
-                    $redis->setex("$symbol:lock", 666, null);
+                    $redis->setex("$symbol:lock", 666, $price);
+
+                    $timer = Time::newTimer(63 * Time::SECOND);
+                    xgo(function () use ($timer, $orderId) {
+                        $timer->channel()->pop();
+
+                        $redis = context()->get('redis');
+                        $redis->lpush("buy:order", $orderId);
+
+                        $conn = $redis->borrow();
+                        $conn = null;
+                    });
 
                     echo $buyRes->data, PHP_EOL;
                 } else {
-                    $redis->setex("$symbol:lock", 333, null);
+                    $redis->setex("$symbol:lock", 333, $price);
 
                     echo $buyRes->{"err-msg"}, PHP_EOL;
                 }
