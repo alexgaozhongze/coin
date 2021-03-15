@@ -19,7 +19,10 @@ class BuyCommand
      */
     public function main()
     {
+        $ticker = Time::newTicker(666);
         while (true) {
+            $ticker->channel()->pop();
+
             $redis = context()->get('redis');
             $symbols = $redis->get('symbol:usdt');
 
@@ -41,76 +44,88 @@ class BuyCommand
 
     public function handle(Channel $chan, $symbol)
     {
+        $chan->push([]);
+
         $coin = new CoinModel();
         $symbolRes = $coin->get_history_kline($symbol, '1min', 9);
         $symbolList = $symbolRes->data;
 
-        $allHasUp = true;
-        foreach ($symbolList as $key => $value) {
-            if (!isset($symbolList[$key + 1])) break;
-            $prev = $symbolList[$key + 1];
-            $hasUp = false;
-            if ($value->close >= $prev->low) {
-                $hasUp = true;
-            }
-            !$hasUp && $allHasUp = false;
+        $beforeGroup = array_slice($symbolList, -6, 6);
+        $nowGroup = array_slice($symbolList, 0, 3);
+
+        $current = reset($nowGroup);
+        $beforeFirst = end($beforeGroup);
+        $beforeEnd = reset($beforeGroup);
+        $nowFirst = end($nowGroup);
+
+        $beforeFirstHighest = true;
+        foreach ($beforeGroup as $value) {
+            $value->high > $beforeFirst->high && $beforeFirstHighest = false;
         }
+        if (!$beforeFirstHighest) return;
 
-        $currentData = reset($symbolList);
-        
-        if ($allHasUp) {
-            $redis = context()->get('redis');
-            if ($redis->setnx("$symbol:lock", null)) {
-                echo $symbol, ' ';
+        $currentHighest = true;
+        foreach ($nowGroup as $value) {
+            $value->high > $current->high && $currentHighest = false;
+        }
+        if (!$currentHighest) return;
 
-                $symbolInfo = $redis->hget('symbol', $symbol);
-                $symbolInfo = unserialize($symbolInfo);
+        $beforeZf = $beforeFirst->open / $beforeEnd->close;
+        if (1.09 > $beforeZf) return;
 
-                list($int, $float) = explode('.', $currentData->close);
-                $float = substr($float, 0, $symbolInfo['price-precision']);
-                $price = "$int.$float";
+        $currZf = $current->close / $nowFirst->open;
+        if (1.03 > $currZf) return;
 
-                $amount = $symbolInfo['min-order-value'] / $price;
-                $mul = 1;
-                for ($i = 0; $i < $symbolInfo['amount-precision']; $i ++) {
-                    $mul *= 10;
-                }
-                $amount *= $mul;
-                $amount = ceil($amount);
-                $amount /= $mul;
-
-                echo $price, ' ', $amount, ' ', date('Y-m-d H:i:s', strtotime("+8 hours")), PHP_EOL;
-
-                $coin = new CoinModel();
-                $buyRes = $coin->place_order($amount, $price, $symbol, 'buy-limit');
-                if ('ok' == $buyRes->status) {
-                    $orderId = $buyRes->data;
-
-                    $redis->setex("$symbol:lock", 666, $price);
-
-                    $timer = Time::newTimer(63 * Time::SECOND);
-                    xgo(function () use ($timer, $orderId) {
-                        $timer->channel()->pop();
-
-                        $redis = context()->get('redis');
-                        $redis->lpush("buy:order", $orderId);
-
-                        $conn = $redis->borrow();
-                        $conn = null;
-                    });
-
-                    echo $buyRes->data, PHP_EOL;
-                } else {
-                    $redis->setex("$symbol:lock", 333, $price);
-
-                    echo $buyRes->{"err-msg"}, PHP_EOL;
-                }
-            }
+        $redis = context()->get('redis');
+        if (!$redis->setnx("buy:symbol:$symbol", null)) {
             $conn = $redis->borrow();
             $conn = null;
+            return;
         }
 
-        $chan->push([]);
+        $symbolInfo = $redis->hget('symbol', $symbol);
+        $symbolInfo = unserialize($symbolInfo);
+
+        list($int, $float) = explode('.', $current->close);
+        $float = substr($float, 0, $symbolInfo['price-precision']);
+        $price = "$int.$float";
+
+        $amount = $symbolInfo['min-order-value'] / $price;
+        $mul = 1;
+        for ($i = 0; $i < $symbolInfo['amount-precision']; $i ++) {
+            $mul *= 10;
+        }
+        $amount *= $mul;
+        $amount = ceil($amount);
+        $amount /= $mul;
+
+        echo $symbol, ' ', $price, ' ', $amount, ' ', date('Y-m-d H:i:s', strtotime("+8 hours")), PHP_EOL;
+        $buyRes = $coin->place_order($amount, $price, $symbol, 'buy-limit');
+        if ('ok' == $buyRes->status) {
+            $orderId = $buyRes->data;
+
+            $redis->setex("buy:symbol:$symbol", 666, $price);
+
+            $timer = Time::newTimer(63 * Time::SECOND);
+            xgo(function () use ($timer, $orderId) {
+                $timer->channel()->pop();
+
+                $redis = context()->get('redis');
+                $redis->lpush("buy:order", $orderId);
+
+                $conn = $redis->borrow();
+                $conn = null;
+            });
+
+            echo $buyRes->data, PHP_EOL;
+        } else {
+            $redis->setex("buy:symbol:$symbol", 333, $price);
+
+            echo $buyRes->{"err-msg"}, PHP_EOL;
+        }
+
+        $conn = $redis->borrow();
+        $conn = null;
     }
 
 }

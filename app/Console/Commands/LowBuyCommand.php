@@ -68,7 +68,7 @@ class LowBuyCommand
         if ($currZf < $prevZf) return false;
 
         $redis = context()->get('redis');
-        if (!$redis->setnx("buy:$symbol", null)) {
+        if (!$redis->setnx("buy:symbol:$symbol", null)) {
             $conn = $redis->borrow();
             $conn = null;
             return false;
@@ -94,7 +94,7 @@ class LowBuyCommand
         $buyRes = $coin->place_order($amount, $price, $symbol, 'buy-limit');
         if ('ok' == $buyRes->status) {
             $orderId = $buyRes->data;
-            $redis->setex("buy:$symbol", 666, $price);
+            $redis->setex("buy:symbol:$symbol", 666, $price);
 
             $ticker = Time::newTicker(6 * Time::SECOND);
             $timer = Time::newTimer(666 * Time::SECOND);
@@ -129,8 +129,7 @@ class LowBuyCommand
                         $price = "$int.$float";
     
                         $sellRes = $coin->place_order($amount, $price, $symbol, 'sell-limit');
-                        echo 'place', PHP_EOL;
-                        var_dump($sellRes);
+                        echo 'sell: ' . $sellRes->data, PHP_EOL;
                         $ticker->stop();
                         $timer->stop();
                         return;
@@ -138,7 +137,7 @@ class LowBuyCommand
                 }
             });
         } else {
-            $redis->setex("buy:$symbol", 333, $price);
+            $redis->setex("buy:symbol:$symbol", 333, $price);
 
             echo $buyRes->{"err-msg"}, PHP_EOL;
         }
