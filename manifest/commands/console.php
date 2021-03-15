@@ -7,6 +7,11 @@ return [
         'usage'   => "\tBuy",
     ],
 
+    'lowbuy' => [
+        \App\Console\Commands\LowBuyCommand::class,
+        'usage'   => "\tLowBuy",
+    ],
+
     'sell' => [
         \App\Console\Commands\SellCommand::class,
         'usage'   => "\tSell",
