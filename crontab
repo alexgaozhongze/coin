@@ -1,4 +1,4 @@
-0 0 * * * /usr/bin/php /data/www/coin/bin/mix.php symbol >> /tmp/symbol.log
+0 * * * * /usr/bin/php /data/www/coin/bin/mix.php symbol >> /tmp/symbol.log
 * * * * * /usr/bin/php /data/www/coin/bin/mix.php ticker >> /tmp/ticker.log
 * * * * * /data/www/coin/buy.sh
 * * * * * /data/www/coin/sell.sh
