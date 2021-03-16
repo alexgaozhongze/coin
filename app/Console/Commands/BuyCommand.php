@@ -24,7 +24,7 @@ class BuyCommand
             $ticker->channel()->pop();
 
             $redis = context()->get('redis');
-            $symbols = $redis->get('symbol:usdt');
+            $symbols = $redis->get('symbol:btc');
 
             $conn = $redis->borrow();
             $conn = null;
@@ -47,37 +47,32 @@ class BuyCommand
         $chan->push([]);
 
         $coin = new CoinModel();
-        $symbolRes = $coin->get_history_kline($symbol, '1min', 9);
+        $symbolRes = $coin->get_history_kline($symbol, '1min', 36);
         $symbolList = $symbolRes->data;
 
-        $beforeGroup = array_slice($symbolList, -6, 6);
-        $nowGroup = array_slice($symbolList, 0, 3);
-
-        $current = reset($nowGroup);
-        $beforeFirst = end($beforeGroup);
-        $beforeEnd = reset($beforeGroup);
-        $nowFirst = end($nowGroup);
-
-        $beforeFirstHighest = true;
-        foreach ($beforeGroup as $value) {
-            $value->high > $beforeFirst->high && $beforeFirstHighest = false;
+        $symbolList = array_reverse($symbolList);
+        foreach ($symbolList as $key => $value) {
+            if ($key) {
+                $value->ema3 = 2 / (3 + 1) * $value->close + (3 - 1) / (3 + 1) * $symbolList[$key - 1]->ema3;
+                $value->ema6 = 2 / (6 + 1) * $value->close + (6 - 1) / (6 + 1) * $symbolList[$key - 1]->ema6;
+                $value->ema9 = 2 / (9 + 1) * $value->close + (9 - 1) / (9 + 1) * $symbolList[$key - 1]->ema9;
+            } else {
+                $value->ema3 = $value->close;
+                $value->ema6 = $value->close;
+                $value->ema9 = $value->close;
+            }
         }
-        if (!$beforeFirstHighest) return;
-
-        $currentHighest = true;
-        foreach ($nowGroup as $value) {
-            $value->high > $current->high && $currentHighest = false;
+        $currentData = end($symbolList);
+        for ($i = 0; $i < 3; $i ++) {
+            $prevData = prev($symbolList);
+            if ($prevData->ema3 >= $currentData->ema3) return;
+            $currentData = current($symbolList);
         }
-        if (!$currentHighest) return;
-
-        $beforeZf = $beforeFirst->open / $beforeEnd->close;
-        if (1.09 > $beforeZf) return;
-
-        $currZf = $current->close / $nowFirst->open;
-        if (1.03 > $currZf) return;
-
+        $currentData = end($symbolList);
+        if (!($currentData->ema3 > $currentData->ema6 && $currentData->ema3 > $currentData->ema9)) return;
+        
         $redis = context()->get('redis');
-        if (!$redis->setnx("buy:symbol:$symbol", null)) {
+        if (!$redis->setnx("buy:symbol:test:$symbol", null)) {
             $conn = $redis->borrow();
             $conn = null;
             return;
@@ -86,7 +81,7 @@ class BuyCommand
         $symbolInfo = $redis->hget('symbol', $symbol);
         $symbolInfo = unserialize($symbolInfo);
 
-        list($int, $float) = explode('.', $current->close);
+        list($int, $float) = explode('.', $currentData->ema3);
         $float = substr($float, 0, $symbolInfo['price-precision']);
         $price = "$int.$float";
 
@@ -100,6 +95,8 @@ class BuyCommand
         $amount /= $mul;
 
         echo $symbol, ' ', $price, ' ', $amount, ' ', date('Y-m-d H:i:s', strtotime("+8 hours")), PHP_EOL;
+        $redis->setex("buy:symbol:test:$symbol", 36, null);
+        return;
         $buyRes = $coin->place_order($amount, $price, $symbol, 'buy-limit');
         if ('ok' == $buyRes->status) {
             $orderId = $buyRes->data;

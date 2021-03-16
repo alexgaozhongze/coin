@@ -24,7 +24,7 @@ class LowBuyCommand
             $ticker->channel()->pop();
 
             $redis = context()->get('redis');
-            $symbols = $redis->get('symbol:usdt');
+            $symbols = $redis->get('symbol:btc');
 
             $conn = $redis->borrow();
             $conn = null;
@@ -90,7 +90,7 @@ class LowBuyCommand
         $amount = ceil($amount);
         $amount /= $mul;
 
-        echo $symbol, ' ', $price, ' ', $amount, ' ', date('Y-m-d H:i:s', strtotime("+8 hours")), PHP_EOL;
+        echo $symbol, ' ', number_format($price, 10, '.', ''), ' ', $amount, ' ', date('Y-m-d H:i:s', strtotime("+8 hours")), PHP_EOL;
         $buyRes = $coin->place_order($amount, $price, $symbol, 'buy-limit');
         if ('ok' == $buyRes->status) {
             $orderId = $buyRes->data;
@@ -104,8 +104,7 @@ class LowBuyCommand
                 
                 $ticker->stop();
                 $cancelRes = $coin->cancel_order($orderId);
-                echo 'channel', PHP_EOL;
-                var_dump($cancelRes);
+                echo 'cancel: ', $cancelRes->data, PHP_EOL;
             });
 
             xgo(function () use ($ticker, $timer, $coin, $orderId, $symbolInfo, $currentData, $symbol) {

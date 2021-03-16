@@ -20,6 +20,7 @@ class TickerCommand
         $client = new Client();
         $response = $client->get("https://api.huobi.pro/market/tickers")->getBody();
 
+        $btc = [];
         $usdt = [];
         $data = json_decode($response, true);
         foreach ($data['data'] as $value) {
@@ -31,16 +32,26 @@ class TickerCommand
                 'symbol' => $value['symbol'],
                 'up' => $value['close'] / $value['open']
             ];
+
+            'btc' == substr($value['symbol'], -3, 3) && $btc[] = [
+                'symbol' => $value['symbol'],
+                'up' => $value['close'] / $value['open']
+            ];
         }
+
+        $sort = array_column($btc, 'up');
+        array_multisort($sort, SORT_DESC, $btc);
+        $btc = array_slice($btc, 0, 3);
+        $btcSymbols = array_column($btc, 'symbol');
 
         $sort = array_column($usdt, 'up');
         array_multisort($sort, SORT_DESC, $usdt);
-
         $usdt = array_slice($usdt, 0, 3);
-        $symbols = array_column($usdt, 'symbol');
+        $usdtSymbols = array_column($usdt, 'symbol');
 
         $redis = context()->get('redis');
-        $redis->set('symbol:usdt', serialize($symbols));
+        $redis->set('symbol:btc', serialize($btcSymbols));
+        $redis->set('symbol:usdt', serialize($usdtSymbols));
         
         $conn = $redis->borrow();
         $conn = null;
