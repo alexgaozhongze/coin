@@ -45,12 +45,12 @@ class TickerCommand
 
         $sort = array_column($btc, 'up');
         array_multisort($sort, SORT_DESC, $btc);
-        $btc = array_slice($btc, 0, 3);
+        $btc = array_slice($btc, 0, 6);
         $btcSymbols = array_column($btc, 'symbol');
 
         $sort = array_column($usdt, 'up');
         array_multisort($sort, SORT_DESC, $usdt);
-        $usdt = array_slice($usdt, 0, 3);
+        $usdt = array_slice($usdt, 0, 6);
         $usdtSymbols = array_column($usdt, 'symbol');
 
         $redis = context()->get('redis');

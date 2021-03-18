@@ -100,7 +100,7 @@ class SellWorker extends AbstractWorker
                             $float = substr($float, 0, $symbolInfo['amount-precision']);
                             $amount = "$int.$float";
         
-                            $price = $currentEma['ema9'];
+                            $price = $currentEma['ema6'];
                             $price < $minPrice && $price = $minPrice;
                             list($int, $float) = explode('.', $price);
                             $float = substr($float, 0, $symbolInfo['price-precision']);
