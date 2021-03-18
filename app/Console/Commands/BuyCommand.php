@@ -31,8 +31,6 @@ class BuyCommand
 
             $symbols = unserialize($symbols);
 
-            $symbols = ['kncusdt'];
-
             $chan = new Channel();
             foreach ($symbols as $symbol) {
                 xgo([$this, 'handle'], $chan, $symbol);
