@@ -7,11 +7,11 @@ use Mix\Coroutine\Channel;
 use Mix\Time\Time;
 
 /**
- * Class BuyCommand
+ * Class HighBuyCommand
  * @package App\Console\Commands
  * @author alex <alexgaozhongze@gmail.com>
  */
-class BuyCommand
+class HighBuyCommand
 {
 
     /**
@@ -24,7 +24,7 @@ class BuyCommand
             $ticker->channel()->pop();
 
             $redis = context()->get('redis');
-            $symbols = $redis->get('symbol:btc');
+            $symbols = $redis->get('symbol:usdt');
 
             $conn = $redis->borrow();
             $conn = null;
@@ -47,32 +47,45 @@ class BuyCommand
         $chan->push([]);
 
         $coin = new CoinModel();
-        $symbolRes = $coin->get_history_kline($symbol, '1min', 36);
+        $symbolRes = $coin->get_history_kline($symbol, '1min', 99);
         $symbolList = $symbolRes->data;
 
         $symbolList = array_reverse($symbolList);
         foreach ($symbolList as $key => $value) {
             if ($key) {
-                $value->ema3 = 2 / (3 + 1) * $value->close + (3 - 1) / (3 + 1) * $symbolList[$key - 1]->ema3;
-                $value->ema6 = 2 / (6 + 1) * $value->close + (6 - 1) / (6 + 1) * $symbolList[$key - 1]->ema6;
-                $value->ema9 = 2 / (9 + 1) * $value->close + (9 - 1) / (9 + 1) * $symbolList[$key - 1]->ema9;
+                $value->ema3  = 2 / (3  + 1) * $value->close + (3  - 1) / (3  + 1) * $symbolList[$key - 1]->ema3;
+                $value->ema6  = 2 / (6  + 1) * $value->close + (6  - 1) / (6  + 1) * $symbolList[$key - 1]->ema6;
+                $value->ema9  = 2 / (9  + 1) * $value->close + (9  - 1) / (9  + 1) * $symbolList[$key - 1]->ema9;
+                $value->ema36 = 2 / (36 + 1) * $value->close + (36 - 1) / (36 + 1) * $symbolList[$key - 1]->ema36;
             } else {
-                $value->ema3 = $value->close;
-                $value->ema6 = $value->close;
-                $value->ema9 = $value->close;
+                $value->ema3  = $value->close;
+                $value->ema6  = $value->close;
+                $value->ema9  = $value->close;
+                $value->ema36 = $value->close;
             }
         }
         $currentData = end($symbolList);
-        for ($i = 0; $i < 3; $i ++) {
+        for ($i = 0; $i < 6; $i ++) {
             $prevData = prev($symbolList);
+            if ($currentData->ema3 <= $currentData->ema6)  return;
+            if ($currentData->ema6 <= $currentData->ema9)  return;
+            if ($currentData->ema9 <= $currentData->ema36) return;
+            if ($prevData->ema3 <= $prevData->ema6)  return;
+            if ($prevData->ema6 <= $prevData->ema9)  return;
+            if ($prevData->ema9 <= $prevData->ema36) return;
             if ($prevData->ema3 >= $currentData->ema3) return;
+            if ($prevData->ema6 >= $currentData->ema6) return;
+            if ($prevData->ema9 >= $currentData->ema9) return;
+            if ($prevData->ema36 >= $currentData->ema36) return;
             $currentData = current($symbolList);
         }
         $currentData = end($symbolList);
-        if (!($currentData->ema3 > $currentData->ema6 && $currentData->ema3 > $currentData->ema9)) return;
+
+        $resetData = reset($symbolList);
+        if ($resetData->ema3 <= $resetData->ema6 || $resetData->ema6 <= $resetData->ema9 || $resetData->ema9 <= $resetData->ema36) return;
         
         $redis = context()->get('redis');
-        if (!$redis->setnx("buy:symbol:test:$symbol", null)) {
+        if (!$redis->setnx("buy:symbol:$symbol", null)) {
             $conn = $redis->borrow();
             $conn = null;
             return;
@@ -95,7 +108,7 @@ class BuyCommand
         $amount /= $mul;
 
         echo $symbol, ' ', $price, ' ', $amount, ' ', date('Y-m-d H:i:s', strtotime("+8 hours")), PHP_EOL;
-        $redis->setex("buy:symbol:test:$symbol", 36, null);
+        $redis->setex("buy:symbol:$symbol", 1, null);
         return;
         $buyRes = $coin->place_order($amount, $price, $symbol, 'buy-limit');
         if ('ok' == $buyRes->status) {
@@ -116,7 +129,7 @@ class BuyCommand
 
             echo $buyRes->data, PHP_EOL;
         } else {
-            $redis->setex("buy:symbol:$symbol", 333, $price);
+            $redis->setex("buy:symbol:high:$symbol", 333, $price);
 
             echo $buyRes->{"err-msg"}, PHP_EOL;
         }

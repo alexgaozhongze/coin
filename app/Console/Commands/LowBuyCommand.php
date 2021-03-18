@@ -24,7 +24,7 @@ class LowBuyCommand
             $ticker->channel()->pop();
 
             $redis = context()->get('redis');
-            $symbols = $redis->get('symbol:btc');
+            $symbols = $redis->get('symbol:usdt');
 
             $conn = $redis->borrow();
             $conn = null;
@@ -63,7 +63,7 @@ class LowBuyCommand
             $value->high > $prevMax && $prevMax = $value->high;
         }
 
-        $currZf = $currentData->high / $currentData->low;
+        $currZf = $currentData->open / $currentData->close;
         $prevZf = $prevMax / $prevMin;
         if ($currZf < $prevZf) return false;
 
@@ -97,7 +97,7 @@ class LowBuyCommand
             $redis->setex("buy:symbol:$symbol", 666, $price);
 
             $ticker = Time::newTicker(6 * Time::SECOND);
-            $timer = Time::newTimer(666 * Time::SECOND);
+            $timer = Time::newTimer(180 * Time::SECOND);
             xgo(function () use ($timer, $ticker, $orderId, $coin) {
                 $ts = $timer->channel()->pop();
                 if (!$ts) return;
@@ -128,9 +128,31 @@ class LowBuyCommand
                         $price = "$int.$float";
     
                         $sellRes = $coin->place_order($amount, $price, $symbol, 'sell-limit');
+                        $orderId = $sellRes->data;
                         echo 'sell: ' . $sellRes->data, PHP_EOL;
                         $ticker->stop();
                         $timer->stop();
+                        
+                        $timer = Time::newTimer(360 * Time::SECOND);
+                        xgo(function () use ($timer, $orderId, $coin, $amount, $symbol) {
+                            $timer->channel()->pop();
+
+                            $order = $coin->get_order($orderId);
+                            $orderInfo = $order->data;
+                            var_dump($orderInfo);
+                            if ('filled' != $orderInfo->state) {
+                                $cancelRes = $coin->cancel_order($orderId);
+                                var_dump($cancelRes);
+
+                                // echo 'cancel:sell: ', $cancelRes->data, PHP_EOL;
+
+                                $sellRes = $coin->place_order($amount, 0, $symbol, 'sell-market');
+                                var_dump($sellRes);
+                                // $orderId = $sellRes->data;
+                                // echo 'sell: ' . $sellRes->data, PHP_EOL;
+                            }
+                        });
+
                         return;
                     }
                 }

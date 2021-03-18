@@ -2,9 +2,9 @@
 
 return [
 
-    'buy' => [
-        \App\Console\Commands\BuyCommand::class,
-        'usage'   => "\tBuy",
+    'highbuy' => [
+        \App\Console\Commands\HighBuyCommand::class,
+        'usage'   => "\tHighBuy",
     ],
 
     'lowbuy' => [
