@@ -2,6 +2,11 @@
 
 return [
 
+    'emabuy' => [
+        \App\Console\Commands\EmaBuyCommand::class,
+        'usage'   => "\tEmaBuy",
+    ],
+
     'highbuy' => [
         \App\Console\Commands\HighBuyCommand::class,
         'usage'   => "\tHighBuy",

@@ -28,6 +28,10 @@ class TickerCommand
             if (1.09 > $value['high'] / $value['low']) continue;
             if (!$value['count']) continue;
 
+            $pattern = '/.*?([\d])l.*?$/';
+            preg_match($pattern, $value['symbol'], $matches);
+            if ($matches) continue;
+
             'usdt' == substr($value['symbol'], -4, 4) && $usdt[] = [
                 'symbol' => $value['symbol'],
                 'up' => $value['close'] / $value['open']
