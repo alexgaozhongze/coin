@@ -2,9 +2,9 @@
 
 return [
 
-    'emabuy' => [
-        \App\Console\Commands\EmaBuyCommand::class,
-        'usage'   => "\tEmaBuy",
+    'buy' => [
+        \App\Console\Commands\BuyCommand::class,
+        'usage'   => "\tBuy",
     ],
 
     'highbuy' => [

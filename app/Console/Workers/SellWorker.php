@@ -3,7 +3,7 @@
 namespace App\Console\Workers;
 
 use App\Console\Models\CoinModel;
-use GuzzleHttp\Client;
+use Mix\Time\Time;
 use Mix\WorkerPool\AbstractWorker;
 
 /**
@@ -31,84 +31,116 @@ class SellWorker extends AbstractWorker
         echo $orderId , " start", PHP_EOL;
 
         $coin = new CoinModel();
-        $order = $coin->get_order($orderId);
-        while (!$order) {
-            sleep(6);
-            $order = $coin->get_order($orderId);
-        }
-        if ('ok' == $order->status) {
-            $orderInfo = $order->data;
-            while ('filled' != $orderInfo->state) {
-                sleep(6);
+        $ticker = Time::newTicker(666);
+        xgo(function () use ($ticker, $coin, $orderId) {
+            while (true) {
+                $ticker->channel()->pop();
+
                 $order = $coin->get_order($orderId);
                 $orderInfo = $order->data;
-            }
-
-            $symbol = $orderInfo->symbol;
-
-            $sell = false;
-            while (!$sell) {
-                $symbolRes = $coin->get_history_kline($symbol, '1min', 3);
-                while (!$symbolRes || 3 != count($symbolRes->data)) {
-                    sleep(6);
-                    $symbolRes = $coin->get_history_kline($symbol, '1min', 3);
-                }
+                $symbol = $orderInfo->symbol;
+                $minPrice = $orderInfo->price * 1.03;
+        
+                $symbolRes = $coin->get_history_kline($symbol, '1min', 63);
                 $symbolList = $symbolRes->data;
-
-                $currentData = reset($symbolList);
-
-                $allDown = true;
-                $isMinLow = true;
-                foreach ($symbolList as $key => $value) {
-                    isset($symbolList[$key + 1]) && $symbolList[$key + 1]->close < $value->close && $allDown = false;
-                    $key && $value->low < $currentData->low && $isMinLow = false;
+        
+                $emaList = [];
+                $symbolList = array_reverse($symbolList);
+                foreach ($symbolList as $value) {
+                    $preEma = end($emaList);
+                    if ($preEma) {
+                        $emaInfo = [
+                            'ema6'  => 2 / (6  + 1) * $value->close + (6  - 1) / (6  + 1) * $preEma['ema6'],
+                            'ema9'  => 2 / (9  + 1) * $value->close + (9  - 1) / (9  + 1) * $preEma['ema9'],
+                            'ema36' => 2 / (36 + 1) * $value->close + (36 - 1) / (36 + 1) * $preEma['ema36']
+                        ];
+                    } else {
+                        $emaInfo = [
+                            'ema6'  => $value->close,
+                            'ema9'  => $value->close,
+                            'ema36' => $value->close
+                        ];
+                    }
+                    $emaList[] = $emaInfo;
                 }
 
-                if ($allDown && $isMinLow) {
-                    echo $symbol, ' ', $currentData->close, ' ', date('Y-m-d H:i:s', strtotime("+8 hours")), PHP_EOL;
-                    echo "order $orderId", PHP_EOL;
-
-                    $amount = $orderInfo->{"field-amount"} - $orderInfo->{"field-fees"};
-
-                    $redis = context()->get('redis');
-                    $symbolInfo = $redis->hget('symbol', $symbol);
-                    $symbolInfo = unserialize($symbolInfo);
+                $currentEma = end($emaList);
+                $prevEma = prev($emaList);
+                if ($currentEma['ema9'] / $currentEma['ema36'] < $prevEma['ema9'] / $prevEma['ema36']) {
+                    $tickerSell = Time::newTicker(666);
+                    $timerSell = Time::newTimer(666666);
+                    xgo(function () use ($timerSell, $tickerSell, $orderId, $coin) {
+                        $ts = $timerSell->channel()->pop();
+                        if (!$ts) return;
+                        
+                        $tickerSell->stop();
+                        $cancelRes = $coin->cancel_order($orderId);
+                        echo 'cancel: ', $cancelRes->data, PHP_EOL;
+                    });
         
-                    list($int, $float) = explode('.', $amount);
-                    $float = substr($float, 0, $symbolInfo['amount-precision']);
-                    $amount = "$int.$float";
+                    xgo(function () use ($tickerSell, $timerSell, $coin, $orderId, $currentEma, $symbol, $minPrice) {
+                        $redis = context()->get('redis');
 
-                    $price = $currentData->close;
-                    $price < $orderInfo->price * 1.03 && $price = $orderInfo->price * 1.03;
-                    list($int, $float) = explode('.', $price);
-                    $float = substr($float, 0, $symbolInfo['price-precision']);
-                    $price = "$int.$float";
+                        $symbolInfo = $redis->hget('symbol', $symbol);
+                        $symbolInfo = unserialize($symbolInfo);
+
+                        $conn = $redis->borrow();
+                        $conn = null;
+
+                        while (true) {
+                            $ts = $tickerSell->channel()->pop();
+                            !$ts && $tickerSell->stop();
+            
+                            $order = $coin->get_order($orderId);
+                            $orderInfo = $order->data;
+            
+                            $amount = $orderInfo->{"field-amount"} - $orderInfo->{"field-fees"};
         
-                    $sellRes = $coin->place_order($amount, $price, $symbol, 'sell-limit');
-                    if ('ok' == $sellRes->status) {
-                        echo 'limit', ' ', $sellRes->data, PHP_EOL;
-
-                        $redis->setex("$symbol:lock", 6, null);
-                        $sell = true;
-                    } elseif ('order-value-min-error' == $sellRes->{"err-code"}) {
-                        $sellRes = $coin->place_order($amount, 0, $symbol, 'sell-market');
-                        if ('ok' == $sellRes->status) {
-                            echo 'market', ' ', $sellRes->data, PHP_EOL;
+                            list($int, $float) = explode('.', $amount);
+                            $float = substr($float, 0, $symbolInfo['amount-precision']);
+                            $amount = "$int.$float";
+        
+                            $price = $currentEma['ema9'];
+                            $price < $minPrice && $price = $minPrice;
+                            list($int, $float) = explode('.', $price);
+                            $float = substr($float, 0, $symbolInfo['price-precision']);
+                            $price = "$int.$float";
+        
+                            $sellRes = $coin->place_order($amount, $price, $symbol, 'sell-limit');
+                            $orderId = $sellRes->data;
+                            echo 'sell: ' . $sellRes->data, PHP_EOL;
+                            $tickerSell->stop();
+                            $timerSell->stop();
+                            
+                            $timerSell = Time::newTimer(666666);
+                            xgo(function () use ($timerSell, $orderId, $coin, $amount, $symbol) {
+                                $timerSell->channel()->pop();
     
-                            $redis->setex("$symbol:lock", 6, null);
-                            $sell = true;
-                        } else {
-                            echo $sellRes->{"err-msg"}, PHP_EOL;
+                                $order = $coin->get_order($orderId);
+                                $orderInfo = $order->data;
+                                var_dump($orderInfo);
+                                if ('filled' != $orderInfo->state) {
+                                    $cancelRes = $coin->cancel_order($orderId);
+                                    var_dump($cancelRes);
+    
+                                    // echo 'cancel:sell: ', $cancelRes->data, PHP_EOL;
+    
+                                    $sellRes = $coin->place_order($amount, 0, $symbol, 'sell-market');
+                                    var_dump($sellRes);
+                                    // $orderId = $sellRes->data;
+                                    // echo 'sell: ' . $sellRes->data, PHP_EOL;
+                                }
+                            });
+    
+                            return;
                         }
-                    } else {
-                        echo $sellRes->{"err-msg"}, PHP_EOL;
-                    }
-    
-                    $conn = $redis->borrow();
-                    $conn = null;
+                    });
+
+                    $ticker->stop();
+                    return;
                 }
             }
-        }
+        });
     }
 
 }

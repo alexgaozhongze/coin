@@ -7,11 +7,11 @@ use Mix\Coroutine\Channel;
 use Mix\Time\Time;
 
 /**
- * Class EmaBuyCommand
+ * Class BuyCommand
  * @package App\Console\Commands
  * @author alex <alexgaozhongze@gmail.com>
  */
-class EmaBuyCommand
+class BuyCommand
 {
 
     /**
@@ -49,7 +49,7 @@ class EmaBuyCommand
         $chan->push([]);
 
         $coin = new CoinModel();
-        $symbolRes = $coin->get_history_kline($symbol, '1min', 666);
+        $symbolRes = $coin->get_history_kline($symbol, '1min', 63);
         $symbolList = $symbolRes->data;
 
         $emaList = [];
@@ -58,11 +58,13 @@ class EmaBuyCommand
             $preEma = end($emaList);
             if ($preEma) {
                 $emaInfo = [
+                    'ema6'  => 2 / (6  + 1) * $value->close + (6  - 1) / (6  + 1) * $preEma['ema6'],
                     'ema9'  => 2 / (9  + 1) * $value->close + (9  - 1) / (9  + 1) * $preEma['ema9'],
                     'ema36' => 2 / (36 + 1) * $value->close + (36 - 1) / (36 + 1) * $preEma['ema36']
                 ];
             } else {
                 $emaInfo = [
+                    'ema6'  => $value->close,
                     'ema9'  => $value->close,
                     'ema36' => $value->close
                 ];
@@ -70,17 +72,15 @@ class EmaBuyCommand
             $emaList[] = $emaInfo;
         }
 
-        var_dump($emaList);
+        $currentEma = end($emaList);
+        for ($i = 0; $i < 6; $i ++) {
+            $prevEma = prev($emaList);
+            if ($currentEma['ema9'] / $currentEma['ema36'] < $prevEma['ema9'] / $prevEma['ema36']) return;
 
+            $currentEma = current($emaList);
+        }
+        $currentEma = end($emaList);
 
-
-
-
-        return;
-
-        $resetData = reset($symbolList);
-        if ($resetData->ema3 <= $resetData->ema6 || $resetData->ema6 <= $resetData->ema9 || $resetData->ema9 <= $resetData->ema36) return;
-        
         $redis = context()->get('redis');
         if (!$redis->setnx("buy:symbol:$symbol", null)) {
             $conn = $redis->borrow();
@@ -91,7 +91,7 @@ class EmaBuyCommand
         $symbolInfo = $redis->hget('symbol', $symbol);
         $symbolInfo = unserialize($symbolInfo);
 
-        list($int, $float) = explode('.', 1);
+        list($int, $float) = explode('.', $currentEma['ema6']);
         $float = substr($float, 0, $symbolInfo['price-precision']);
         $price = "$int.$float";
 
@@ -104,29 +104,46 @@ class EmaBuyCommand
         $amount = ceil($amount);
         $amount /= $mul;
 
-        echo $symbol, ' ', $price, ' ', $amount, ' ', date('Y-m-d H:i:s', strtotime("+8 hours")), PHP_EOL;
-        $redis->setex("buy:symbol:$symbol", 1, null);
-        return;
+        echo 'buy: ', $symbol, ' ', $price, ' ', $amount, ' ', date('Y-m-d H:i:s', strtotime("+8 hours")), PHP_EOL;
+        $redis->setex("buy:symbol:$symbol", 666, $price);
         $buyRes = $coin->place_order($amount, $price, $symbol, 'buy-limit');
         if ('ok' == $buyRes->status) {
             $orderId = $buyRes->data;
 
-            $redis->setex("buy:symbol:$symbol", 666, $price);
-
-            $timer = Time::newTimer(63 * Time::SECOND);
-            xgo(function () use ($timer, $orderId) {
-                $timer->channel()->pop();
-
-                $redis = context()->get('redis');
-                $redis->lpush("buy:order", $orderId);
-
-                $conn = $redis->borrow();
-                $conn = null;
+            $ticker = Time::newTicker(666);
+            $timer = Time::newTimer(666666);
+            xgo(function () use ($timer, $ticker, $orderId, $coin, $symbol) {
+                $ts = $timer->channel()->pop();
+                if (!$ts) return;
+                
+                $ticker->stop();
+                $cancelRes = $coin->cancel_order($orderId);
+                echo 'cancel: ', $symbol, ' ', $cancelRes->data, PHP_EOL;
             });
 
+            xgo(function () use ($ticker, $timer, $coin, $orderId, $symbolInfo, $currentEma, $symbol) {
+                while (true) {
+                    $ts = $ticker->channel()->pop();
+                    !$ts && $ticker->stop();
+    
+                    $order = $coin->get_order($orderId);
+                    $orderInfo = $order->data;
+    
+                    if (isset($orderInfo->state) && 'filled' == $orderInfo->state) {    
+                        $redis = context()->get('redis');
+                        $redis->lpush("buy:order", $orderId);
+        
+                        $conn = $redis->borrow();
+                        $conn = null;
+
+                        $timer->stop();
+                        return;
+                    }
+                }
+            });
             echo $buyRes->data, PHP_EOL;
         } else {
-            $redis->setex("buy:symbol:high:$symbol", 333, $price);
+            $redis->setex("buy:symbol:high:$symbol", 66, $price);
 
             echo $buyRes->{"err-msg"}, PHP_EOL;
         }
