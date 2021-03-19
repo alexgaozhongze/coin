@@ -39,7 +39,6 @@ class SellWorker extends AbstractWorker
                 $order = $coin->get_order($orderId);
                 $orderInfo = $order->data;
                 $symbol = $orderInfo->symbol;
-                $minPrice = $orderInfo->price * 1.03;
         
                 $symbolRes = $coin->get_history_kline($symbol, '1min', 63);
                 $symbolList = $symbolRes->data;
@@ -78,7 +77,7 @@ class SellWorker extends AbstractWorker
                         echo 'cancel: ', $cancelRes->data, PHP_EOL;
                     });
         
-                    xgo(function () use ($tickerSell, $timerSell, $coin, $orderId, $currentEma, $symbol, $minPrice) {
+                    xgo(function () use ($tickerSell, $timerSell, $coin, $orderId, $currentEma, $symbol) {
                         $redis = context()->get('redis');
 
                         $symbolInfo = $redis->hget('symbol', $symbol);
@@ -101,6 +100,8 @@ class SellWorker extends AbstractWorker
                             $amount = "$int.$float";
         
                             $price = $currentEma['ema6'];
+                            $minPrice = $symbolInfo['min-order-value'] / $amount;
+
                             $price < $minPrice && $price = $minPrice;
                             list($int, $float) = explode('.', $price);
                             $float = substr($float, 0, $symbolInfo['price-precision']);

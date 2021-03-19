@@ -28,9 +28,13 @@ class TickerCommand
             if (1.09 > $value['high'] / $value['low']) continue;
             if (!$value['count']) continue;
 
-            $pattern = '/.*?([\d])l.*?$/';
+            $pattern = '/.*?([\d])[l|s].*?$/';
             preg_match($pattern, $value['symbol'], $matches);
             if ($matches) continue;
+
+            if ('fil3susdt' == $value['symbol']) {
+                var_dump($value);die;
+            }
 
             'usdt' == substr($value['symbol'], -4, 4) && $usdt[] = [
                 'symbol' => $value['symbol'],
@@ -56,6 +60,8 @@ class TickerCommand
         $redis = context()->get('redis');
         $redis->set('symbol:btc', serialize($btcSymbols));
         $redis->set('symbol:usdt', serialize($usdtSymbols));
+
+        var_dump($usdtSymbols);
         
         $conn = $redis->borrow();
         $conn = null;
