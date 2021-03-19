@@ -28,6 +28,7 @@ class BuyCommand
             $notify->channel()->pop();
             $ticker->stop();
             $notify->stop();
+            return;
         });
 
         xgo(function () use ($ticker) {
@@ -57,8 +58,6 @@ class BuyCommand
 
     public function handle(Channel $chan, $symbol)
     {
-        $chan->push([]);
-
         $coin = new CoinModel();
         $symbolRes = $coin->get_history_kline($symbol, '1min', 63);
         $symbolList = $symbolRes->data;
@@ -161,6 +160,8 @@ class BuyCommand
 
         $conn = $redis->borrow();
         $conn = null;
+
+        $chan->push([]);
     }
 
 }

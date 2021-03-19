@@ -64,80 +64,61 @@ class SellWorker extends AbstractWorker
                 }
 
                 $currentEma = end($emaList);
+                prev($emaList);
                 $prevEma = prev($emaList);
+                unset($symbolList ,$emaList);
+
                 if ($currentEma['ema9'] / $currentEma['ema36'] < $prevEma['ema9'] / $prevEma['ema36']) {
-                    $tickerSell = Time::newTicker(666);
-                    $timerSell = Time::newTimer(666666);
-                    xgo(function () use ($timerSell, $tickerSell, $orderId, $coin) {
-                        $ts = $timerSell->channel()->pop();
-                        if (!$ts) return;
-                        
-                        $tickerSell->stop();
-                        $cancelRes = $coin->cancel_order($orderId);
-                        echo 'cancel: ', $cancelRes->data, PHP_EOL;
-                    });
+                    $ticker->stop();
         
-                    xgo(function () use ($tickerSell, $timerSell, $coin, $orderId, $currentEma, $symbol) {
-                        $redis = context()->get('redis');
+                    $redis = context()->get('redis');
 
-                        $symbolInfo = $redis->hget('symbol', $symbol);
-                        $symbolInfo = unserialize($symbolInfo);
+                    $symbolInfo = $redis->hget('symbol', $symbol);
+                    $symbolInfo = unserialize($symbolInfo);
 
-                        $conn = $redis->borrow();
-                        $conn = null;
+                    $conn = $redis->borrow();
+                    $conn = null;
 
-                        while (true) {
-                            $ts = $tickerSell->channel()->pop();
-                            !$ts && $tickerSell->stop();
-            
-                            $order = $coin->get_order($orderId);
-                            $orderInfo = $order->data;
-            
-                            $amount = $orderInfo->{"field-amount"} - $orderInfo->{"field-fees"};
-        
-                            list($int, $float) = explode('.', $amount);
-                            $float = substr($float, 0, $symbolInfo['amount-precision']);
-                            $amount = "$int.$float";
-        
-                            $price = $currentEma['ema6'];
-                            $minPrice = $symbolInfo['min-order-value'] / $amount;
+                    $order = $coin->get_order($orderId);
+                    $orderInfo = $order->data;
+    
+                    $amount = $orderInfo->{"field-amount"} - $orderInfo->{"field-fees"};
 
-                            $price < $minPrice && $price = $minPrice;
-                            list($int, $float) = explode('.', $price);
-                            $float = substr($float, 0, $symbolInfo['price-precision']);
-                            $price = "$int.$float";
-        
-                            $sellRes = $coin->place_order($amount, $price, $symbol, 'sell-limit');
-                            $orderId = $sellRes->data;
-                            echo 'sell: ' . $sellRes->data, PHP_EOL;
-                            $tickerSell->stop();
-                            $timerSell->stop();
-                            
-                            $timerSell = Time::newTimer(666666);
-                            xgo(function () use ($timerSell, $orderId, $coin, $amount, $symbol) {
-                                $timerSell->channel()->pop();
-    
-                                $order = $coin->get_order($orderId);
-                                $orderInfo = $order->data;
-                                var_dump($orderInfo);
-                                if ($orderInfo && 'filled' != $orderInfo->state) {
-                                    $cancelRes = $coin->cancel_order($orderId);
-                                    var_dump($cancelRes);
-    
-                                    // echo 'cancel:sell: ', $cancelRes->data, PHP_EOL;
-    
-                                    $sellRes = $coin->place_order($amount, 0, $symbol, 'sell-market');
-                                    var_dump($sellRes);
-                                    // $orderId = $sellRes->data;
-                                    // echo 'sell: ' . $sellRes->data, PHP_EOL;
-                                }
-                            });
-    
-                            return;
+                    list($int, $float) = explode('.', $amount);
+                    $float = substr($float, 0, $symbolInfo['amount-precision']);
+                    $amount = "$int.$float";
+
+                    $price = $currentEma['ema6'];
+                    $minPrice = $symbolInfo['min-order-value'] / $amount;
+
+                    $price < $minPrice && $price = $minPrice;
+                    $mul = 1;
+                    for ($i = 0; $i < $symbolInfo['price-precision']; $i ++) {
+                        $mul *= 10;
+                    }
+                    $price *= $mul;
+                    $price = ceil($price);
+                    $price /= $mul;
+
+                    $sellRes = $coin->place_order($amount, $price, $symbol, 'sell-limit');
+                    $orderId = $sellRes->data;
+                    echo "sell:limit:$symbol " . $sellRes->data, PHP_EOL;
+
+                    $timer = Time::newTimer(666666);
+                    xgo(function () use ($timer, $orderId, $coin, $amount, $symbol) {
+                        $timer->channel()->pop();
+
+                        $order = $coin->get_order($orderId);
+                        $orderInfo = $order->data;
+                        if ('filled' != $orderInfo->state) {
+                            $cancelRes = $coin->cancel_order($orderId);
+                            echo "sell:cancel:$symbol ", $cancelRes->data, PHP_EOL;
+
+                            $sellRes = $coin->place_order($amount, 0, $symbol, 'sell-market');
+                            echo "sell:marcket:$symbol " . $sellRes->data, PHP_EOL;
                         }
                     });
 
-                    $ticker->stop();
                     return;
                 }
             }

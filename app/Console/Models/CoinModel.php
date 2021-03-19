@@ -385,33 +385,13 @@ class CoinModel
 		'POST' == $this->req_method && $params = ['json' => $postdata];
 
 		$res = $client->request($this->req_method, $url, $params);
-		while (200 != $res->getStatusCode()) {
-			sleep(6);
-			$res = $client->request($this->req_method, $url, $params);
-		}
+		file_put_contents('/tmp/request.log', $res->getStatusCode() . ' ' . $url . ' ' . $res->getBody() . PHP_EOL, FILE_APPEND);
+		// while (200 != $res->getStatusCode()) {
+		// 	sleep(6);
+		// 	$res = $client->request($this->req_method, $url, $params);
+		// }
 
 		return $res->getBody();
-
-
-
-		$ch = curl_init();
-		curl_setopt($ch,CURLOPT_URL, $url);
-		if ($this->req_method == 'POST') {
-			curl_setopt($ch, CURLOPT_POST, 1);
-			curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postdata));
-		}
-		curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);
-		curl_setopt($ch,CURLOPT_HEADER,0);
-		curl_setopt($ch, CURLOPT_TIMEOUT,60);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, FALSE);  
-		curl_setopt ($ch, CURLOPT_HTTPHEADER, [
-			"Content-Type: application/json",
-			]);
-		$output = curl_exec($ch);
-		$info = curl_getinfo($ch);
-		curl_close($ch);
-		return $output;
 	}
 }
 ?>
