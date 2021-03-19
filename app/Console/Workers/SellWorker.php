@@ -66,9 +66,9 @@ class SellWorker extends AbstractWorker
                 $currentEma = end($emaList);
                 prev($emaList);prev($emaList);
                 $prevEma = prev($emaList);
-                foreach ($emaList as $value) {
-                    echo $value['ema9'] / $value['ema36'], PHP_EOL;
-                }
+                // foreach ($emaList as $value) {
+                //     echo $value['ema9'] / $value['ema36'], PHP_EOL;
+                // }
                 unset($symbolList ,$emaList);
 
                 if ($currentEma['ema9'] / $currentEma['ema36'] < $prevEma['ema9'] / $prevEma['ema36']) {
@@ -118,7 +118,7 @@ class SellWorker extends AbstractWorker
                             echo "sell:cancel:$symbol ", $cancelRes->data, PHP_EOL;
 
                             $sellRes = $coin->place_order($amount, 0, $symbol, 'sell-market');
-                            echo "sell:marcket:$symbol " . $sellRes->data, PHP_EOL;
+                            echo "sell:market:$symbol " . $sellRes->data, PHP_EOL;
                         }
                     });
 
