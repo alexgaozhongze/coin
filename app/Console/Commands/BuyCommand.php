@@ -24,14 +24,14 @@ class BuyCommand
 
         $ticker = Time::newTicker(666);
 
-        xgo(function () use ($notify, $ticker) {
+        xgo(function () use ($notify, &$ticker) {
             $notify->channel()->pop();
             $ticker->stop();
             $notify->stop();
             return;
         });
 
-        xgo(function () use ($ticker) {
+        xgo(function () use (&$ticker) {
             while (true) {
                 $ts = $ticker->channel()->pop();
                 if (!$ts) return;
@@ -91,6 +91,8 @@ class BuyCommand
         }
         $currentEma = end($emaList);
 
+        unset($symbolRes, $symbolList, $emaList);
+
         $redis = context()->get('redis');
         if (!$redis->setnx("buy:symbol:$symbol", null)) {
             $conn = $redis->borrow();
@@ -114,15 +116,15 @@ class BuyCommand
         $amount = ceil($amount);
         $amount /= $mul;
 
-        echo 'buy: ', $symbol, ' ', $price, ' ', $amount, ' ', date('Y-m-d H:i:s', strtotime("+8 hours")), PHP_EOL;
+        echo 'buy: ', $symbol, ' ', $price, ' ', $amount, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
         $redis->setex("buy:symbol:$symbol", 666, $price);
         $buyRes = $coin->place_order($amount, $price, $symbol, 'buy-limit');
         if ('ok' == $buyRes->status) {
-            echo 'buy: ', $symbol, ' ', $buyRes->data, ' ', date('Y-m-d H:i:s', strtotime("+8 hours")), PHP_EOL;
+            echo 'buy: ', $symbol, ' ', $buyRes->data, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
             $orderId = $buyRes->data;
 
             $ticker = Time::newTicker(666);
-            $timer = Time::newTimer(666666);
+            $timer = Time::newTimer(180000);
             xgo(function () use ($timer, $ticker, $orderId, $coin, $symbol) {
                 $ts = $timer->channel()->pop();
                 if (!$ts) return;

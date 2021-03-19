@@ -28,7 +28,7 @@ class SellWorker extends AbstractWorker
      */
     public function do($orderId)
     {
-        echo $orderId , " start", PHP_EOL;
+        echo $orderId , " start", ' ', date('H:i:s'), PHP_EOL;
 
         $coin = new CoinModel();
         $ticker = Time::newTicker(666);
@@ -105,7 +105,7 @@ class SellWorker extends AbstractWorker
 
                     $sellRes = $coin->place_order($amount, $price, $symbol, 'sell-limit');
                     $orderId = $sellRes->data;
-                    echo "sell:limit:$symbol " . $sellRes->data, PHP_EOL;
+                    echo "sell:limit:$symbol " . $sellRes->data, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
 
                     $timer = Time::newTimer(666666);
                     xgo(function () use ($timer, $orderId, $coin, $amount, $symbol) {
@@ -115,10 +115,10 @@ class SellWorker extends AbstractWorker
                         $orderInfo = $order->data;
                         if ('filled' != $orderInfo->state) {
                             $cancelRes = $coin->cancel_order($orderId);
-                            echo "sell:cancel:$symbol ", $cancelRes->data, PHP_EOL;
+                            echo "sell:cancel:$symbol ", $cancelRes->data, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
 
                             $sellRes = $coin->place_order($amount, 0, $symbol, 'sell-market');
-                            echo "sell:market:$symbol " . $sellRes->data, PHP_EOL;
+                            echo "sell:market:$symbol " . $sellRes->data, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
                         }
                     });
 
