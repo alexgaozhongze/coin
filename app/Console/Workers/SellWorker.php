@@ -120,7 +120,7 @@ class SellWorker extends AbstractWorker
                                 $order = $coin->get_order($orderId);
                                 $orderInfo = $order->data;
                                 var_dump($orderInfo);
-                                if ('filled' != $orderInfo->state) {
+                                if ($orderInfo && 'filled' != $orderInfo->state) {
                                     $cancelRes = $coin->cancel_order($orderId);
                                     var_dump($cancelRes);
     

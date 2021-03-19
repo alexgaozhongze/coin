@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Console\Models\CoinModel;
 use Mix\Coroutine\Channel;
+use Mix\Signal\SignalNotify;
 use Mix\Time\Time;
 
 /**
@@ -19,27 +20,39 @@ class BuyCommand
      */
     public function main()
     {
+        $notify = new SignalNotify(SIGHUP, SIGINT, SIGTERM);
+
         $ticker = Time::newTicker(666);
-        while (true) {
-            $ticker->channel()->pop();
 
-            $redis = context()->get('redis');
-            $symbols = $redis->get('symbol:usdt');
+        xgo(function () use ($notify, $ticker) {
+            $notify->channel()->pop();
+            $ticker->stop();
+            $notify->stop();
+        });
 
-            $conn = $redis->borrow();
-            $conn = null;
-
-            $symbols = unserialize($symbols);
-
-            $chan = new Channel();
-            foreach ($symbols as $symbol) {
-                xgo([$this, 'handle'], $chan, $symbol);
-            }
+        xgo(function () use ($ticker) {
+            while (true) {
+                $ts = $ticker->channel()->pop();
+                if (!$ts) return;
     
-            foreach ($symbols as $symbol) {
-                $chan->pop(6);
+                $redis = context()->get('redis');
+                $symbols = $redis->get('symbol:usdt');
+    
+                $conn = $redis->borrow();
+                $conn = null;
+    
+                $symbols = unserialize($symbols);
+    
+                $chan = new Channel();
+                foreach ($symbols as $symbol) {
+                    xgo([$this, 'handle'], $chan, $symbol);
+                }
+        
+                foreach ($symbols as $symbol) {
+                    $chan->pop(6);
+                }
             }
-        }
+        });
     }
 
     public function handle(Channel $chan, $symbol)

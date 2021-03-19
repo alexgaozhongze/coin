@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Console\Workers\SellWorker;
 use Mix\Coroutine\Channel;
+use Mix\Signal\SignalNotify;
 use Mix\WorkerPool\WorkerDispatcher;
 
 /**
@@ -18,10 +19,18 @@ class SellCommand
      */
     public function main()
     {
+        $notify = new SignalNotify(SIGHUP, SIGINT, SIGTERM);
+
         $maxWorkers = 6; 
         $maxQueue   = 3;
         $jobQueue   = new Channel($maxQueue);
         $dispatcher = new WorkerDispatcher($jobQueue, $maxWorkers, SellWorker::class);
+
+        xgo(function () use ($notify, $dispatcher) {
+            $notify->channel()->pop();
+            $dispatcher->stop();
+            $notify->stop();
+        });
 
         xgo(function () use ($jobQueue, $dispatcher) {
             // 投放任务
