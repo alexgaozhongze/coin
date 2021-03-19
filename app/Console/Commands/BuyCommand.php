@@ -118,6 +118,7 @@ class BuyCommand
         $redis->setex("buy:symbol:$symbol", 666, $price);
         $buyRes = $coin->place_order($amount, $price, $symbol, 'buy-limit');
         if ('ok' == $buyRes->status) {
+            echo 'buy: ', $symbol, ' ', $buyRes->data, ' ', date('Y-m-d H:i:s', strtotime("+8 hours")), PHP_EOL;
             $orderId = $buyRes->data;
 
             $ticker = Time::newTicker(666);
@@ -139,7 +140,7 @@ class BuyCommand
                     $order = $coin->get_order($orderId);
                     $orderInfo = $order->data;
     
-                    if (isset($orderInfo->state) && 'filled' == $orderInfo->state) {    
+                    if ('filled' == $orderInfo->state) {    
                         $redis = context()->get('redis');
                         $redis->lpush("buy:order", $orderId);
         
@@ -151,7 +152,6 @@ class BuyCommand
                     }
                 }
             });
-            echo $buyRes->data, PHP_EOL;
         } else {
             $redis->setex("buy:symbol:high:$symbol", 66, $price);
 
