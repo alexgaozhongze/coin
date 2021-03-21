@@ -40,7 +40,7 @@ class SellWorker extends AbstractWorker
                 $orderInfo = $order->data;
                 $symbol = $orderInfo->symbol;
         
-                $symbolRes = $coin->get_history_kline($symbol, '1min', 63);
+                $symbolRes = $coin->get_history_kline($symbol, '1min', 36);
                 $symbolList = $symbolRes->data;
         
                 $emaList = [];
@@ -49,29 +49,29 @@ class SellWorker extends AbstractWorker
                     $preEma = end($emaList);
                     if ($preEma) {
                         $emaInfo = [
+                            'ema3'  => 2 / (3  + 1) * $value->close + (3  - 1) / (3  + 1) * $preEma['ema3'],
                             'ema6'  => 2 / (6  + 1) * $value->close + (6  - 1) / (6  + 1) * $preEma['ema6'],
                             'ema9'  => 2 / (9  + 1) * $value->close + (9  - 1) / (9  + 1) * $preEma['ema9'],
-                            'ema36' => 2 / (36 + 1) * $value->close + (36 - 1) / (36 + 1) * $preEma['ema36']
                         ];
                     } else {
                         $emaInfo = [
+                            'ema3'  => $value->close,
                             'ema6'  => $value->close,
                             'ema9'  => $value->close,
-                            'ema36' => $value->close
                         ];
                     }
                     $emaList[] = $emaInfo;
                 }
 
                 $currentEma = end($emaList);
-                prev($emaList);prev($emaList);
                 $prevEma = prev($emaList);
+                $pPrevEma = prev($emaList);
                 // foreach ($emaList as $value) {
                 //     echo $value['ema9'] / $value['ema36'], PHP_EOL;
                 // }
                 unset($symbolList ,$emaList);
 
-                if ($currentEma['ema9'] / $currentEma['ema36'] < $prevEma['ema9'] / $prevEma['ema36']) {
+                if ($prevEma['ema3'] < $pPrevEma['ema3']) {
                     $ticker->stop();
         
                     $redis = context()->get('redis');
@@ -95,6 +95,7 @@ class SellWorker extends AbstractWorker
                     $minPrice = $symbolInfo['min-order-value'] / $amount;
 
                     $price < $minPrice && $price = $minPrice;
+                    $price *= 1.002;
                     $mul = 1;
                     for ($i = 0; $i < $symbolInfo['price-precision']; $i ++) {
                         $mul *= 10;
@@ -105,9 +106,9 @@ class SellWorker extends AbstractWorker
 
                     $sellRes = $coin->place_order($amount, $price, $symbol, 'sell-limit');
                     $orderId = $sellRes->data;
-                    echo "sell:limit:$symbol " . $sellRes->data, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
+                    echo "sell:limit:$symbol $price " . $sellRes->data, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
 
-                    $timer = Time::newTimer(666666);
+                    $timer = Time::newTimer(999999);
                     xgo(function () use ($timer, $orderId, $coin, $amount, $symbol) {
                         $timer->channel()->pop();
 
@@ -120,6 +121,8 @@ class SellWorker extends AbstractWorker
                             $sellRes = $coin->place_order($amount, 0, $symbol, 'sell-market');
                             echo "sell:market:$symbol " . $sellRes->data, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
                         }
+
+                        return;
                     });
 
                     return;

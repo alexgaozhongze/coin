@@ -24,14 +24,14 @@ class BuyCommand
 
         $ticker = Time::newTicker(666);
 
-        xgo(function () use ($notify, &$ticker) {
+        xgo(function () use ($notify, $ticker) {
             $notify->channel()->pop();
             $ticker->stop();
             $notify->stop();
             return;
         });
 
-        xgo(function () use (&$ticker) {
+        xgo(function () use ($ticker) {
             while (true) {
                 $ts = $ticker->channel()->pop();
                 if (!$ts) return;
@@ -68,24 +68,35 @@ class BuyCommand
             $preEma = end($emaList);
             if ($preEma) {
                 $emaInfo = [
+                    'ema3'  => 2 / (3  + 1) * $value->close + (3  - 1) / (3  + 1) * $preEma['ema3'],
                     'ema6'  => 2 / (6  + 1) * $value->close + (6  - 1) / (6  + 1) * $preEma['ema6'],
                     'ema9'  => 2 / (9  + 1) * $value->close + (9  - 1) / (9  + 1) * $preEma['ema9'],
                     'ema36' => 2 / (36 + 1) * $value->close + (36 - 1) / (36 + 1) * $preEma['ema36']
                 ];
             } else {
                 $emaInfo = [
+                    'ema3'  => $value->close,
                     'ema6'  => $value->close,
                     'ema9'  => $value->close,
                     'ema36' => $value->close
                 ];
             }
+            $emaInfo['low'] = $value->low;
             $emaList[] = $emaInfo;
         }
 
         $currentEma = end($emaList);
+        if ($currentEma['ema9'] < $currentEma['ema36']) goto chanPush;
+
+        $lowerEma6  = false;
+        $lowerEma9  = false;
+        $lowerEma36 = false;
         for ($i = 0; $i < 6; $i ++) {
             $prevEma = prev($emaList);
-            if ($currentEma['ema9'] / $currentEma['ema36'] < $prevEma['ema9'] / $prevEma['ema36']) return;
+            $prevEma['low'] < $prevEma['ema6']  && $lowerEma6  = true;
+            $prevEma['low'] < $prevEma['ema9']  && $lowerEma9  = true;
+            $prevEma['low'] < $prevEma['ema36'] && $lowerEma36 = true;
+            if ($currentEma['ema9'] / $currentEma['ema36'] < $prevEma['ema9'] / $prevEma['ema36']) goto chanPush;
 
             $currentEma = current($emaList);
         }
@@ -97,13 +108,17 @@ class BuyCommand
         if (!$redis->setnx("buy:symbol:$symbol", null)) {
             $conn = $redis->borrow();
             $conn = null;
-            return;
+            goto chanPush;
         }
 
         $symbolInfo = $redis->hget('symbol', $symbol);
         $symbolInfo = unserialize($symbolInfo);
 
-        list($int, $float) = explode('.', $currentEma['ema6']);
+        $buyPrice = $currentEma['ema3'];
+        $lowerEma6  && $buyPrice = $currentEma['ema6'];
+        $lowerEma9  && $buyPrice = $currentEma['ema9'];
+        $lowerEma36 && $buyPrice = $currentEma['ema36'];
+        list($int, $float) = explode('.', $buyPrice);
         $float = substr($float, 0, $symbolInfo['price-precision']);
         $price = "$int.$float";
 
@@ -115,6 +130,8 @@ class BuyCommand
         $amount *= $mul;
         $amount = ceil($amount);
         $amount /= $mul;
+
+        unset($symbolInfo);
 
         echo 'buy: ', $symbol, ' ', $price, ' ', $amount, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
         $redis->setex("buy:symbol:$symbol", 666, $price);
@@ -130,14 +147,17 @@ class BuyCommand
                 if (!$ts) return;
                 
                 $ticker->stop();
+                $timer->stop();
                 $cancelRes = $coin->cancel_order($orderId);
                 echo 'cancel: ', $symbol, ' ', $cancelRes->data, PHP_EOL;
+
+                return;
             });
 
-            xgo(function () use ($ticker, $timer, $coin, $orderId, $symbolInfo, $currentEma, $symbol) {
+            xgo(function () use ($ticker, $timer, $coin, $orderId, $currentEma, $symbol) {
                 while (true) {
                     $ts = $ticker->channel()->pop();
-                    !$ts && $ticker->stop();
+                    if (!$ts) return;
     
                     $order = $coin->get_order($orderId);
                     $orderInfo = $order->data;
@@ -150,6 +170,7 @@ class BuyCommand
                         $conn = null;
 
                         $timer->stop();
+                        $ticker->stop();
                         return;
                     }
                 }
@@ -163,7 +184,7 @@ class BuyCommand
         $conn = $redis->borrow();
         $conn = null;
 
+        chanPush:
         $chan->push([]);
     }
-
 }
