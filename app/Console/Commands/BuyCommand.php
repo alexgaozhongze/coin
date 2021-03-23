@@ -22,7 +22,7 @@ class BuyCommand
     {
         $notify = new SignalNotify(SIGHUP, SIGINT, SIGTERM);
 
-        $ticker = Time::newTicker(666);
+        $ticker = Time::newTicker(3666);
 
         xgo(function () use ($notify, $ticker) {
             $notify->channel()->pop();
@@ -115,7 +115,7 @@ class BuyCommand
         $amount /= $mul;
 
         echo 'buy: ', $symbol, ' ', $price, ' ', $amount, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
-        $redis->setex("buy:symbol:$symbol", 666, $price);
+        $redis->setex("buy:symbol:$symbol", 66, $price);
         $buyRes = $coin->place_order($amount, $price, $symbol, 'buy-limit');
         if ('ok' == $buyRes->status) {
             echo 'buy: ', $symbol, ' ', $buyRes->data, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
@@ -127,11 +127,16 @@ class BuyCommand
                 $ts = $timer->channel()->pop();
                 if (!$ts) return;
                 
+                $redis = context()->get('redis');
+                $redis->setex("buy:symbol:$symbol", 66, null);
+
+                $conn = $redis->borrow();
+                $conn = null;
+
                 $ticker->stop();
                 $timer->stop();
                 $cancelRes = $coin->cancel_order($orderId);
                 echo 'cancel: ', $symbol, ' ', $cancelRes->data, PHP_EOL;
-
                 return;
             });
 
