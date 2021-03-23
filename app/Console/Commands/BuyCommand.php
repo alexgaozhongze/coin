@@ -100,6 +100,7 @@ class BuyCommand
         $symbolInfo = unserialize($symbolInfo);
 
         $buyPrice = $currentKline->close;
+        $sellPrice = $currentKline->high;
         list($int, $float) = explode('.', $buyPrice);
         $float = substr($float, 0, $symbolInfo['price-precision']);
         $price = "$int.$float";
@@ -134,7 +135,7 @@ class BuyCommand
                 return;
             });
 
-            xgo(function () use ($ticker, $timer, $coin, $orderId, $symbolInfo, $symbol, $price) {
+            xgo(function () use ($ticker, $timer, $coin, $orderId, $symbolInfo, $symbol, $sellPrice) {
                 while (true) {
                     $ts = $ticker->channel()->pop();
                     if (!$ts) return;
@@ -149,7 +150,6 @@ class BuyCommand
                         $float = substr($float, 0, $symbolInfo['amount-precision']);
                         $amount = "$int.$float";
                 
-                        $sellPrice = $price * 1.01;
                         $mul = 1;
                         for ($i = 0; $i < $symbolInfo['price-precision']; $i ++) {
                             $mul *= 10;
