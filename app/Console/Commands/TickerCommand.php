@@ -54,7 +54,7 @@ class TickerCommand
 
         $sort = array_column($usdt, 'up');
         array_multisort($sort, SORT_DESC, $usdt);
-        $usdt = array_slice($usdt, 0, 6);
+        // $usdt = array_slice($usdt, 0, 6);
         $usdtSymbols = array_column($usdt, 'symbol');
 
         $redis = context()->get('redis');

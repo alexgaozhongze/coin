@@ -43,7 +43,7 @@ class BuyCommand
                 $conn = null;
     
                 $symbols = unserialize($symbols);
-    
+
                 $chan = new Channel();
                 foreach ($symbols as $symbol) {
                     xgo([$this, 'handle'], $chan, $symbol);
@@ -59,12 +59,12 @@ class BuyCommand
     public function handle(Channel $chan, $symbol)
     {
         $coin = new CoinModel();
-        $symbolRes = $coin->get_history_kline($symbol, '1min', 63);
-        $symbolList = $symbolRes->data;
+        $klineRes = $coin->get_history_kline($symbol, '1min', 63);
+        $klineList = $klineRes->data;
 
         $emaList = [];
-        $symbolList = array_reverse($symbolList);
-        foreach ($symbolList as $value) {
+        $klineList = array_reverse($klineList);
+        foreach ($klineList as $value) {
             $preEma = end($emaList);
             if ($preEma) {
                 $emaInfo = [
@@ -81,28 +81,13 @@ class BuyCommand
                     'ema36' => $value->close
                 ];
             }
-            $emaInfo['low'] = $value->low;
             $emaList[] = $emaInfo;
         }
 
+        $currentKline = end($klineList);
         $currentEma = end($emaList);
-        if ($currentEma['ema9'] < $currentEma['ema36']) goto chanPush;
-
-        $lowerEma6  = false;
-        $lowerEma9  = false;
-        $lowerEma36 = false;
-        for ($i = 0; $i < 6; $i ++) {
-            $prevEma = prev($emaList);
-            $prevEma['low'] < $prevEma['ema6']  && $lowerEma6  = true;
-            $prevEma['low'] < $prevEma['ema9']  && $lowerEma9  = true;
-            $prevEma['low'] < $prevEma['ema36'] && $lowerEma36 = true;
-            if ($currentEma['ema9'] / $currentEma['ema36'] < $prevEma['ema9'] / $prevEma['ema36']) goto chanPush;
-
-            $currentEma = current($emaList);
-        }
-        $currentEma = end($emaList);
-
-        unset($symbolRes, $symbolList, $emaList);
+        if (1.01 > $currentEma['ema3'] / $currentKline->close) goto chanPush;
+        unset($klineRes, $klineList, $emaList);
 
         $redis = context()->get('redis');
         if (!$redis->setnx("buy:symbol:$symbol", null)) {
@@ -114,10 +99,7 @@ class BuyCommand
         $symbolInfo = $redis->hget('symbol', $symbol);
         $symbolInfo = unserialize($symbolInfo);
 
-        $buyPrice = $currentEma['ema3'];
-        $lowerEma6  && $buyPrice = $currentEma['ema6'];
-        $lowerEma9  && $buyPrice = $currentEma['ema9'];
-        $lowerEma36 && $buyPrice = $currentEma['ema36'];
+        $buyPrice = $currentKline->close;
         list($int, $float) = explode('.', $buyPrice);
         $float = substr($float, 0, $symbolInfo['price-precision']);
         $price = "$int.$float";
@@ -131,8 +113,6 @@ class BuyCommand
         $amount = ceil($amount);
         $amount /= $mul;
 
-        unset($symbolInfo);
-
         echo 'buy: ', $symbol, ' ', $price, ' ', $amount, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
         $redis->setex("buy:symbol:$symbol", 666, $price);
         $buyRes = $coin->place_order($amount, $price, $symbol, 'buy-limit');
@@ -141,7 +121,7 @@ class BuyCommand
             $orderId = $buyRes->data;
 
             $ticker = Time::newTicker(666);
-            $timer = Time::newTimer(180000);
+            $timer = Time::newTimer(6666);
             xgo(function () use ($timer, $ticker, $orderId, $coin, $symbol) {
                 $ts = $timer->channel()->pop();
                 if (!$ts) return;
@@ -154,7 +134,7 @@ class BuyCommand
                 return;
             });
 
-            xgo(function () use ($ticker, $timer, $coin, $orderId, $currentEma, $symbol) {
+            xgo(function () use ($ticker, $timer, $coin, $orderId, $symbolInfo, $symbol, $price) {
                 while (true) {
                     $ts = $ticker->channel()->pop();
                     if (!$ts) return;
@@ -162,21 +142,41 @@ class BuyCommand
                     $order = $coin->get_order($orderId);
                     $orderInfo = $order->data;
     
-                    if ('filled' == $orderInfo->state) {    
-                        $redis = context()->get('redis');
-                        $redis->lpush("buy:order", $orderId);
+                    if ('filled' == $orderInfo->state) {   
+                        $amount = $orderInfo->{"field-amount"} - $orderInfo->{"field-fees"};
+
+                        list($int, $float) = explode('.', $amount);
+                        $float = substr($float, 0, $symbolInfo['amount-precision']);
+                        $amount = "$int.$float";
+                
+                        $sellPrice = $price * 1.01;
+                        $mul = 1;
+                        for ($i = 0; $i < $symbolInfo['price-precision']; $i ++) {
+                            $mul *= 10;
+                        }
+                        $sellPrice *= $mul;
+                        $sellPrice = ceil($sellPrice);
+                        $sellPrice /= $mul;
+                
+                        $sellRes = $coin->place_order($amount, $sellPrice, $symbol, 'sell-limit');
+                        $orderId = $sellRes->data;
+
+                        echo 'sell: ', $symbol, ' ', $orderId, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
+                        // $redis = context()->get('redis');
+                        // $redis->lpush("buy:order", $orderId);
         
-                        $conn = $redis->borrow();
-                        $conn = null;
+                        // $conn = $redis->borrow();
+                        // $conn = null;
 
                         $timer->stop();
                         $ticker->stop();
                         return;
                     }
                 }
+                return;
             });
         } else {
-            $redis->setex("buy:symbol:high:$symbol", 66, $price);
+            $redis->setex("buy:symbol:$symbol", 66, $price);
 
             echo $buyRes->{"err-msg"}, PHP_EOL;
         }
