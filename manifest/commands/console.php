@@ -2,6 +2,11 @@
 
 return [
 
+    'usdt' => [
+        \App\Console\Commands\UsdtCommand::class,
+        'usage'   => "\tUsdt",
+    ],
+
     'buy' => [
         \App\Console\Commands\BuyCommand::class,
         'usage'   => "\tBuy",

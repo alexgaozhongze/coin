@@ -8,11 +8,11 @@ use Mix\Signal\SignalNotify;
 use Mix\Time\Time;
 
 /**
- * Class BuyCommand
+ * Class UsdtCommand
  * @package App\Console\Commands
  * @author alex <alexgaozhongze@gmail.com>
  */
-class BuyCommand
+class UsdtCommand
 {
 
     /**
