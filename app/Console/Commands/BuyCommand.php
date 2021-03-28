@@ -64,7 +64,11 @@ class BuyCommand
 
         $emaList = [];
         $klineList = array_reverse($klineList);
+        $currentKline = end($klineList);
+
+        $low = $currentKline->low;
         foreach ($klineList as $value) {
+            $value->low < $low && $low = $value->low;
             $preEma = end($emaList);
             if ($preEma) {
                 $emaInfo = [
@@ -84,9 +88,8 @@ class BuyCommand
             $emaList[] = $emaInfo;
         }
 
-        $currentKline = end($klineList);
         $currentEma = end($emaList);
-        if (1.01 > $currentEma['ema3'] / $currentKline->close) goto chanPush;
+        if (1.01 > $currentEma['ema3'] / $currentKline->close || $low == $currentKline->low) goto chanPush;
         unset($klineRes, $klineList, $emaList);
 
         $redis = context()->get('redis');

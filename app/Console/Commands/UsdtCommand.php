@@ -44,6 +44,8 @@ class UsdtCommand
     
                 $symbols = unserialize($symbols);
 
+                $symbols = ['flowusdt'];
+
                 $chan = new Channel();
                 foreach ($symbols as $symbol) {
                     xgo([$this, 'handle'], $chan, $symbol);
@@ -61,39 +63,72 @@ class UsdtCommand
         $coin = new CoinModel();
         $klineRes = $coin->get_history_kline($symbol, '1min', 63);
         $klineList = $klineRes->data;
-
-        $emaList = [];
         $klineList = array_reverse($klineList);
-        foreach ($klineList as $value) {
-            $preEma = end($emaList);
-            if ($preEma) {
-                $emaInfo = [
-                    'ema3'  => 2 / (3  + 1) * $value->close + (3  - 1) / (3  + 1) * $preEma['ema3'],
-                    'ema6'  => 2 / (6  + 1) * $value->close + (6  - 1) / (6  + 1) * $preEma['ema6'],
-                    'ema9'  => 2 / (9  + 1) * $value->close + (9  - 1) / (9  + 1) * $preEma['ema9'],
-                    'ema36' => 2 / (36 + 1) * $value->close + (36 - 1) / (36 + 1) * $preEma['ema36']
-                ];
+
+        xgo(function () use ($symbol, $klineList) {
+            $this->buy($symbol, $klineList);
+        });
+        
+        $chan->push([]);
+    }
+
+    public function buy($symbol, $klineList)
+    {
+        foreach ($klineList as $key => $value) {
+            if ($key) {
+                $preEma = $klineList[$key - 1];
             } else {
-                $emaInfo = [
+                $preEma = (object) [
                     'ema3'  => $value->close,
                     'ema6'  => $value->close,
                     'ema9'  => $value->close,
                     'ema36' => $value->close
                 ];
             }
-            $emaList[] = $emaInfo;
+
+            $value->ema3  = 2 / (3  + 1) * $value->close + (3  - 1) / (3  + 1) * $preEma->ema3;
+            $value->ema6  = 2 / (6  + 1) * $value->close + (6  - 1) / (6  + 1) * $preEma->ema6;
+            $value->ema9  = 2 / (9  + 1) * $value->close + (9  - 1) / (9  + 1) * $preEma->ema9;
+            $value->ema36 = 2 / (36 + 1) * $value->close + (36 - 1) / (36 + 1) * $preEma->ema36;
+
+            $klineList[$key] = $value;
+
+            if (1.01 < $value->ema3 / $value->low) {
+                $str = date('H:i:s', $value->id + 3600 * 8);
+                echo $str, PHP_EOL;
+                $kline = $value;
+                $nextKey = $key;
+                do {
+                    $nextKey ++;
+                    if (!isset($klineList[$nextKey])) break;
+
+                    $kline = $klineList[$nextKey];
+                    if ($value->close >= $kline->open) continue;
+
+                    $str .= ' ' . date('H:i:s', $kline->id + 3600 * 8);
+
+                    echo $str, PHP_EOL;
+                    break;
+                } while (true);
+
+
+                // var_dump($value);
+            }
         }
+
+        die;
+        var_dump($klineList);die;
 
         $currentKline = end($klineList);
         $currentEma = end($emaList);
-        if (1.01 > $currentEma['ema3'] / $currentKline->close) goto chanPush;
+        // if (1.01 > $currentEma['ema3'] / $currentKline->close) goto chanPush;
         unset($klineRes, $klineList, $emaList);
 
         $redis = context()->get('redis');
         if (!$redis->setnx("buy:symbol:$symbol", null)) {
             $conn = $redis->borrow();
             $conn = null;
-            goto chanPush;
+            // goto chanPush;
         }
 
         $symbolInfo = $redis->hget('symbol', $symbol);
@@ -189,7 +224,7 @@ class UsdtCommand
         $conn = $redis->borrow();
         $conn = null;
 
-        chanPush:
-        $chan->push([]);
+
     }
+
 }
