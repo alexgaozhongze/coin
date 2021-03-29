@@ -118,7 +118,7 @@ class BuyCommand
         $amount /= $mul;
 
         echo 'buy: ', $symbol, ' ', $price, ' ', $amount, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
-        $redis->setex("buy:symbol:$symbol", 36, $price);
+        $redis->setex("buy:symbol:$symbol", 63, $price);
         $buyRes = $coin->place_order($amount, $price, $symbol, 'buy-limit');
         if ('ok' == $buyRes->status) {
             echo 'buy: ', $symbol, ' ', $buyRes->data, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
@@ -131,7 +131,7 @@ class BuyCommand
                 if (!$ts) return;
                 
                 $redis = context()->get('redis');
-                $redis->setex("buy:symbol:$symbol", 36, null);
+                $redis->setex("buy:symbol:$symbol", 63, null);
 
                 $conn = $redis->borrow();
                 $conn = null;
@@ -184,7 +184,7 @@ class BuyCommand
                 return;
             });
         } else {
-            $redis->setex("buy:symbol:$symbol", 36, $price);
+            $redis->setex("buy:symbol:$symbol", 63, $price);
 
             echo $buyRes->{"err-msg"}, PHP_EOL;
         }
