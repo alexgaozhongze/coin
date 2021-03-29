@@ -163,7 +163,7 @@ class BuyCommand
                             $mul *= 10;
                         }
                         $sellPrice *= $mul;
-                        $sellPrice = ceil($sellPrice);
+                        $sellPrice = ceil($sellPrice) - 3;
                         $sellPrice /= $mul;
                 
                         $sellRes = $coin->place_order($amount, $sellPrice, $symbol, 'sell-limit');
