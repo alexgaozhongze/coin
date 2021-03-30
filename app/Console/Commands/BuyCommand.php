@@ -62,6 +62,8 @@ class BuyCommand
         $klineRes = $coin->get_history_kline($symbol, '1min', 63);
         $klineList = $klineRes->data;
 
+        if (63 > count($klineList)) goto chanPush;
+
         $emaList = [];
         $klineList = array_reverse($klineList);
         $currentKline = end($klineList);
@@ -108,7 +110,10 @@ class BuyCommand
         $float = substr($float, 0, $symbolInfo['price-precision']);
         $price = "$int.$float";
 
-        $amount = $symbolInfo['min-order-value'] / $price;
+        $minOrderValue = $symbolInfo['min-order-value'];
+        $minOrderValue *= 1.2;
+
+        $amount = $minOrderValue / $price;
         $mul = 1;
         for ($i = 0; $i < $symbolInfo['amount-precision']; $i ++) {
             $mul *= 10;
