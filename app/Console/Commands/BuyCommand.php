@@ -63,6 +63,21 @@ class BuyCommand
         $klineRes = $coin->get_history_kline($symbol, '1min', 63);
         $klineList = $klineRes->data;
 
+        if (6 >= count($klineList)) {
+            $redis = context()->get('redis');
+            if (!$redis->setnx("buy:symbol:$symbol", null)) {
+                $conn = $redis->borrow();
+                $conn = null;
+                goto chanPush;
+            }
+            $redis->expire("buy:symbol:$symbol", 666666);
+            $conn = $redis->borrow();
+            $conn = null;
+
+            $buyRes = $coin->place_order(12, 0, $symbol, 'buy-market');
+            echo "buy:new:$symbol " . $buyRes->data, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
+        }
+
         if (63 > count($klineList)) goto chanPush;
 
         $emaList = [];
