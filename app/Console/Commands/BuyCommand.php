@@ -22,7 +22,8 @@ class BuyCommand
     {
         $notify = new SignalNotify(SIGHUP, SIGINT, SIGTERM);
 
-        $ticker = Time::newTicker(3 * Time::SECOND);
+        // $ticker = Time::newTicker(1.8 * Time::SECOND);
+        $ticker = Time::newTicker(999);
 
         xgo(function () use ($notify, $ticker) {
             $notify->channel()->pop();
@@ -100,6 +101,7 @@ class BuyCommand
             $conn = null;
             goto chanPush;
         }
+        $redis->expire("buy:symbol:$symbol", 6);
 
         $symbolInfo = $redis->hget('symbol', $symbol);
         $symbolInfo = unserialize($symbolInfo);
@@ -111,7 +113,7 @@ class BuyCommand
         $price = "$int.$float";
 
         $minOrderValue = $symbolInfo['min-order-value'];
-        $minOrderValue *= 1.2;
+        $minOrderValue *= 2.4;
 
         $amount = $minOrderValue / $price;
         $mul = 1;

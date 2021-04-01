@@ -32,10 +32,6 @@ class TickerCommand
             preg_match($pattern, $value['symbol'], $matches);
             if ($matches) continue;
 
-            if ('fil3susdt' == $value['symbol']) {
-                var_dump($value);die;
-            }
-
             'usdt' == substr($value['symbol'], -4, 4) && $usdt[] = [
                 'symbol' => $value['symbol'],
                 'up' => $value['close'] / $value['open']
@@ -61,8 +57,6 @@ class TickerCommand
         $redis->set('symbol:btc', serialize($btcSymbols));
         $redis->set('symbol:usdt', serialize($usdtSymbols));
 
-        var_dump($usdtSymbols);
-        
         $conn = $redis->borrow();
         $conn = null;
     }
