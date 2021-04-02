@@ -110,7 +110,7 @@ class UsdtCommand
             $conn = null;
 
             $coin = new CoinModel();
-            $buyRes = $coin->place_order(12, 0, $symbol, 'buy-market');
+            $buyRes = $coin->place_order(15, 0, $symbol, 'buy-market');
             echo "buy:new:$symbol " . $buyRes->data, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
 
         } elseif (63 == $klineCount) {

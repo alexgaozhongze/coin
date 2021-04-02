@@ -74,7 +74,7 @@ class BuyCommand
             $conn = $redis->borrow();
             $conn = null;
 
-            $buyRes = $coin->place_order(12, 0, $symbol, 'buy-market');
+            $buyRes = $coin->place_order(15, 0, $symbol, 'buy-market');
             echo "buy:new:$symbol " . $buyRes->data, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
         }
 
