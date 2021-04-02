@@ -46,6 +46,7 @@ class UsdtCommand
 
                 // $symbols = ['stnusdt'];
                 // $symbols = ['insurusdt'];
+                $symbols = ['dacusdt'];
 
                 $chan = new Channel();
                 foreach ($symbols as $symbol) {
@@ -118,14 +119,15 @@ class UsdtCommand
             foreach ($klineList as $key => $kline) {
                 $str = '';
                 if ($key && 1.02 <= $klineList[$key - 1]->ema3 / $kline->low) {
-                    if (!isset($klineList[$key + 1])) continue;
-                    $triggerNextId = $klineList[$key + 1]->id;
-                    $triggerKline = $kline;
+                    
+                    // if (!isset($klineList[$key + 1])) continue;
+                    // $triggerNextId = $klineList[$key + 1]->id;
+                    // $triggerKline = $kline;
                 }
             }
 
-            $currentKline = end($klineList);
-            if ($triggerNextId != $currentKline->id || $triggerKline->low <= $currentKline->close) return;
+            // $currentKline = end($klineList);
+            // if ($triggerNextId != $currentKline->id || $triggerKline->low <= $currentKline->close) return;
 
             echo $symbol, PHP_EOL;
         }

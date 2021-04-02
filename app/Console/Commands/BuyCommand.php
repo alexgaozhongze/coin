@@ -128,7 +128,7 @@ class BuyCommand
         $price = "$int.$float";
 
         $minOrderValue = $symbolInfo['min-order-value'];
-        $minOrderValue *= 2.4;
+        $minOrderValue *= 3;
 
         $amount = $minOrderValue / $price;
         $mul = 1;
@@ -147,7 +147,7 @@ class BuyCommand
             $orderId = $buyRes->data;
 
             $ticker = Time::newTicker(666);
-            $timer = Time::newTimer(3666);
+            $timer = Time::newTimer(6666);
             xgo(function () use ($timer, $ticker, $orderId, $coin, $symbol) {
                 $ts = $timer->channel()->pop();
                 if (!$ts) return;
