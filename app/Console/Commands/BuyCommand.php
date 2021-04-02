@@ -74,7 +74,7 @@ class BuyCommand
             $conn = $redis->borrow();
             $conn = null;
 
-            $buyRes = $coin->place_order(15, 0, $symbol, 'buy-market');
+            $buyRes = $coin->place_order(18, 0, $symbol, 'buy-market');
             echo "buy:new:$symbol " . $buyRes->data, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
         }
 
@@ -128,7 +128,7 @@ class BuyCommand
         $price = "$int.$float";
 
         $minOrderValue = $symbolInfo['min-order-value'];
-        $minOrderValue *= 3;
+        $minOrderValue *= 3.6;
 
         $amount = $minOrderValue / $price;
         $mul = 1;

@@ -46,7 +46,7 @@ class UsdtCommand
 
                 // $symbols = ['stnusdt'];
                 // $symbols = ['insurusdt'];
-                $symbols = ['dacusdt'];
+                $symbols = ['emusdt'];
 
                 $chan = new Channel();
                 foreach ($symbols as $symbol) {
@@ -114,22 +114,35 @@ class UsdtCommand
             echo "buy:new:$symbol " . $buyRes->data, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
 
         } elseif (63 == $klineCount) {
-            $triggerNextId = 0;
-            $triggerKline = (object) [];
+            $buyId = 0;
+            $buyKline = (object) [];
+            $triggerKey = 0;
+            $break = 0;
             foreach ($klineList as $key => $kline) {
-                $str = '';
-                if ($key && 1.02 <= $klineList[$key - 1]->ema3 / $kline->low) {
-                    
-                    // if (!isset($klineList[$key + 1])) continue;
-                    // $triggerNextId = $klineList[$key + 1]->id;
-                    // $triggerKline = $kline;
+                if ($triggerKey) {
+                    if ($kline->low < $klineList[$key - 1]->low) {
+                        if ($kline->close > $kline->open && $kline->close <= $klineList[$key - 1]->low) {
+                            $buyId = $kline->id;
+                            $buyKline = $kline;
+                        } else {
+                            $triggerKey = $key;
+                        }
+                    } else {
+                        if (3 == $break) {
+                            $triggerKey = $break = 0;
+                            continue;
+                        }
+                        $break ++;
+                    }
+                } elseif ($key && 1.02 <= $klineList[$key - 1]->ema3 / $kline->low) {
+                    $triggerKey = $key;
+                    echo 'trigger: ', "$symbol ", date('H:i:s', $kline->id + 28800), PHP_EOL;
                 }
             }
 
-            // $currentKline = end($klineList);
-            // if ($triggerNextId != $currentKline->id || $triggerKline->low <= $currentKline->close) return;
-
-            echo $symbol, PHP_EOL;
+            if ($buyId) {
+                echo 'buy: ' , $symbol, ' ', $buyId, ' ', date('H:i:s', $buyId + 28800), PHP_EOL;
+            }
         }
 
         return;
