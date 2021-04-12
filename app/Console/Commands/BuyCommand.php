@@ -74,7 +74,7 @@ class BuyCommand
             $conn = $redis->borrow();
             $conn = null;
 
-            $buyRes = $coin->place_order(18, 0, $symbol, 'buy-market');
+            $buyRes = $coin->place_order(36, 0, $symbol, 'buy-market');
             echo "buy:new:$symbol " . $buyRes->data, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
         }
 
@@ -108,6 +108,7 @@ class BuyCommand
 
         $currentEma = end($emaList);
         if (1.01 > $currentEma['ema3'] / $currentKline->close || $low == $currentKline->low) goto chanPush;
+        if ($currentKline->low >= $currentEma['ema36']) goto chanPush;
         unset($klineRes, $klineList, $emaList);
 
         $redis = context()->get('redis');
@@ -128,7 +129,7 @@ class BuyCommand
         $price = "$int.$float";
 
         $minOrderValue = $symbolInfo['min-order-value'];
-        $minOrderValue *= 3.6;
+        $minOrderValue *= 7.2;
 
         $amount = $minOrderValue / $price;
         $mul = 1;
@@ -147,7 +148,7 @@ class BuyCommand
             $orderId = $buyRes->data;
 
             $ticker = Time::newTicker(666);
-            $timer = Time::newTimer(6666);
+            $timer = Time::newTimer(36 * Time::SECOND);
             xgo(function () use ($timer, $ticker, $orderId, $coin, $symbol) {
                 $ts = $timer->channel()->pop();
                 if (!$ts) return;

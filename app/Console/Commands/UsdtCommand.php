@@ -46,7 +46,7 @@ class UsdtCommand
 
                 // $symbols = ['stnusdt'];
                 // $symbols = ['insurusdt'];
-                $symbols = ['emusdt'];
+                // $symbols = ['mdsusdt'];
 
                 $chan = new Channel();
                 foreach ($symbols as $symbol) {
@@ -117,16 +117,13 @@ class UsdtCommand
             $buyId = 0;
             $buyKline = (object) [];
             $triggerKey = 0;
+            $triggerLow = 0;
             $break = 0;
             foreach ($klineList as $key => $kline) {
                 if ($triggerKey) {
-                    if ($kline->low < $klineList[$key - 1]->low) {
-                        if ($kline->close > $kline->open && $kline->close <= $klineList[$key - 1]->low) {
-                            $buyId = $kline->id;
-                            $buyKline = $kline;
-                        } else {
-                            $triggerKey = $key;
-                        }
+                    if ($kline->close <= $triggerLow && $kline->low < $klineList[$key - 1]->low && $kline->close > $kline->open) {
+                        $buyId = $kline->id;
+                        $buyKline = $kline;
                     } else {
                         if (3 == $break) {
                             $triggerKey = $break = 0;
@@ -136,6 +133,7 @@ class UsdtCommand
                     }
                 } elseif ($key && 1.02 <= $klineList[$key - 1]->ema3 / $kline->low) {
                     $triggerKey = $key;
+                    $triggerLow = $kline->low;
                     echo 'trigger: ', "$symbol ", date('H:i:s', $kline->id + 28800), PHP_EOL;
                 }
             }

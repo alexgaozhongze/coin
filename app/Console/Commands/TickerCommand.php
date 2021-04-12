@@ -17,6 +17,8 @@ class TickerCommand
      */
     public function main()
     {
+        sleep(36);
+
         $client = new Client();
         $response = $client->get("https://api.huobi.pro/market/tickers")->getBody();
 
@@ -24,8 +26,8 @@ class TickerCommand
         $usdt = [];
         $data = json_decode($response, true);
         foreach ($data['data'] as $value) {
-            if (!$value['high'] || !$value['low']) continue;
-            if (1.09 > $value['high'] / $value['low']) continue;
+            if (!$value['close'] || !$value['open']) continue;
+            if (1.08 > $value['close'] / $value['open']) continue;
             if (!$value['count']) continue;
 
             $pattern = '/.*?([\d])[l|s].*?$/';
