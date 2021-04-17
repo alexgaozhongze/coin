@@ -21,10 +21,7 @@ class BuyCommand
     public function main()
     {
         $notify = new SignalNotify(SIGHUP, SIGINT, SIGTERM);
-
-        // $ticker = Time::newTicker(1.8 * Time::SECOND);
         $ticker = Time::newTicker(999);
-
         xgo(function () use ($notify, $ticker) {
             $notify->channel()->pop();
             $ticker->stop();
@@ -59,6 +56,8 @@ class BuyCommand
 
     public function handle(Channel $chan, $symbol)
     {
+        $orderNum = 63;
+
         $coin = new CoinModel();
         $klineRes = $coin->get_history_kline($symbol, '1min', 63);
         $klineList = $klineRes->data;
@@ -74,7 +73,7 @@ class BuyCommand
             $conn = $redis->borrow();
             $conn = null;
 
-            $buyRes = $coin->place_order(36, 0, $symbol, 'buy-market');
+            $buyRes = $coin->place_order($orderNum, 0, $symbol, 'buy-market');
             echo "buy:new:$symbol " . $buyRes->data, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
         }
 
@@ -128,8 +127,9 @@ class BuyCommand
         $float = substr($float, 0, $symbolInfo['price-precision']);
         $price = "$int.$float";
 
-        $minOrderValue = $symbolInfo['min-order-value'];
-        $minOrderValue *= 7.2;
+        // $minOrderValue = $symbolInfo['min-order-value'];
+        // $minOrderValue *= 7.2;
+        $minOrderValue = $orderNum;
 
         $amount = $minOrderValue / $price;
         $mul = 1;
@@ -148,7 +148,7 @@ class BuyCommand
             $orderId = $buyRes->data;
 
             $ticker = Time::newTicker(666);
-            $timer = Time::newTimer(36 * Time::SECOND);
+            $timer = Time::newTimer(6.66 * Time::SECOND);
             xgo(function () use ($timer, $ticker, $orderId, $coin, $symbol) {
                 $ts = $timer->channel()->pop();
                 if (!$ts) return;
