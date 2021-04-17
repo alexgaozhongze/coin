@@ -26,8 +26,9 @@ class TickerCommand
         $usdt = [];
         $data = json_decode($response, true);
         foreach ($data['data'] as $value) {
-            if (!$value['high'] || !$value['low']) continue;
+            if (!$value['high'] || !$value['low'] || !$value['open'] || !$value['colse']) continue;
             if (1.11 > $value['high'] / $value['low']) continue;
+            if (1.98 < $value['colse'] / $value['open']) continue;
             if (!$value['count']) continue;
 
             $pattern = '/.*?([\d])[l|s].*?$/';
