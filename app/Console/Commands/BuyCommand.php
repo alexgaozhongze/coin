@@ -116,7 +116,7 @@ class BuyCommand
             $conn = null;
             goto chanPush;
         }
-        $redis->expire("buy:symbol:$symbol", 6);
+        $redis->expire("buy:symbol:$symbol", 36);
 
         $symbolInfo = $redis->hget('symbol', $symbol);
         $symbolInfo = unserialize($symbolInfo);
@@ -141,7 +141,6 @@ class BuyCommand
         $amount /= $mul;
 
         echo 'buy: ', $symbol, ' ', $price, ' ', $amount, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
-        $redis->setex("buy:symbol:$symbol", 96, $price);
         $buyRes = $coin->place_order($amount, $price, $symbol, 'buy-limit');
         if ('ok' == $buyRes->status) {
             echo 'buy: ', $symbol, ' ', $buyRes->data, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
@@ -149,19 +148,37 @@ class BuyCommand
 
             $ticker = Time::newTicker(666);
             $timer = Time::newTimer(6.66 * Time::SECOND);
-            xgo(function () use ($timer, $ticker, $orderId, $coin, $symbol) {
+            xgo(function () use ($timer, $ticker, $orderId, $coin, $symbol, $symbolInfo, $sellPrice) {
                 $ts = $timer->channel()->pop();
                 if (!$ts) return;
                 
-                $redis = context()->get('redis');
-                $redis->setex("buy:symbol:$symbol", 96, null);
-
-                $conn = $redis->borrow();
-                $conn = null;
-
                 $ticker->stop();
                 $timer->stop();
+
+                $order = $coin->get_order($orderId);
+                $orderInfo = $order->data;
                 $cancelRes = $coin->cancel_order($orderId);
+                if (in_array($orderInfo->state, ['filled', 'partial-filled'])) {
+                    $amount = $orderInfo->{"field-amount"} - $orderInfo->{"field-fees"};
+
+                    list($int, $float) = explode('.', $amount);
+                    $float = substr($float, 0, $symbolInfo['amount-precision']);
+                    $amount = "$int.$float";
+            
+                    $mul = 1;
+                    for ($i = 0; $i < $symbolInfo['price-precision']; $i ++) {
+                        $mul *= 10;
+                    }
+                    $sellPrice *= $mul;
+                    $sellPrice = ceil($sellPrice) - 3;
+                    $sellPrice /= $mul;
+            
+                    $sellRes = $coin->place_order($amount, $sellPrice, $symbol, 'sell-limit');
+                    $orderId = $sellRes->data;
+
+                    echo 'sell: ', $symbol, ' ', $orderId, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
+                }
+
                 echo 'cancel: ', $symbol, ' ', $cancelRes->data, PHP_EOL;
                 return;
             });
@@ -174,7 +191,7 @@ class BuyCommand
                     $order = $coin->get_order($orderId);
                     $orderInfo = $order->data;
     
-                    if ('filled' == $orderInfo->state) {   
+                    if ('filled' == $orderInfo->state) {
                         $amount = $orderInfo->{"field-amount"} - $orderInfo->{"field-fees"};
 
                         list($int, $float) = explode('.', $amount);
@@ -193,11 +210,6 @@ class BuyCommand
                         $orderId = $sellRes->data;
 
                         echo 'sell: ', $symbol, ' ', $orderId, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
-                        // $redis = context()->get('redis');
-                        // $redis->lpush("buy:order", $orderId);
-        
-                        // $conn = $redis->borrow();
-                        // $conn = null;
 
                         $timer->stop();
                         $ticker->stop();
@@ -207,8 +219,6 @@ class BuyCommand
                 return;
             });
         } else {
-            $redis->setex("buy:symbol:$symbol", 96, $price);
-
             echo $buyRes->{"err-msg"}, PHP_EOL;
         }
 
