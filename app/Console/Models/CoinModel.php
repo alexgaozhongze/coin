@@ -385,12 +385,7 @@ class CoinModel
 		'POST' == $this->req_method && $params = ['json' => $postdata];
 
 		$res = $client->request($this->req_method, $url, $params);
-		// file_put_contents('/tmp/request.log', $res->getStatusCode() . ' ' . $url . ' ' . $res->getBody() . PHP_EOL, FILE_APPEND);
-		// while (200 != $res->getStatusCode()) {
-		// 	sleep(6);
-		// 	$res = $client->request($this->req_method, $url, $params);
-		// }
-
+		
 		return $res->getBody();
 	}
 }
