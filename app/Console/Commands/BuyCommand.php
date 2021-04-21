@@ -116,7 +116,7 @@ class BuyCommand
             $conn = null;
             goto chanPush;
         }
-        $redis->expire("buy:symbol:$symbol", 36);
+        $redis->expire("buy:symbol:$symbol", 666);
 
         $symbolInfo = $redis->hget('symbol', $symbol);
         $symbolInfo = unserialize($symbolInfo);
