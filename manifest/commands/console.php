@@ -2,6 +2,11 @@
 
 return [
 
+    'htusdt' => [
+        \App\Console\Commands\HtusdtCommand::class,
+        'usage'   => "\thtusdt",
+    ],
+
     'usdt' => [
         \App\Console\Commands\UsdtCommand::class,
         'usage'   => "\tUsdt",
