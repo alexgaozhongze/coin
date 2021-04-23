@@ -11,11 +11,11 @@ use Mix\Time\Time;
 
 
 /**
- * Class HtusdtCommand
+ * Class EthusdtCommand
  * @package App\Console\Commands
  * @author alex <alexgaozhongze@gmail.com>
  */
-class HtusdtCommand
+class EthusdtCommand
 {
 
     /**
@@ -56,7 +56,7 @@ class HtusdtCommand
             $notify->stop();
         });
 
-        $symbol = 'htusdt';
+        $symbol = 'ethusdt';
 
         $symbolInfo = $this->conn->hget('symbol', $symbol);
         $symbolInfo = unserialize($symbolInfo);

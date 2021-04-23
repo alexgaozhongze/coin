@@ -7,6 +7,11 @@ return [
         'usage'   => "\thtusdt",
     ],
 
+    'ethusdt' => [
+        \App\Console\Commands\EthusdtCommand::class,
+        'usage'   => "\tethusdt",
+    ],
+
     'usdt' => [
         \App\Console\Commands\UsdtCommand::class,
         'usage'   => "\tUsdt",
