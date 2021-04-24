@@ -74,8 +74,6 @@ class EthusdtCommand
 
     public function handle($symbol, $symbolInfo)
     {
-        $orderNum = 6;
-
         $coin = new CoinModel();
         $klineRes = $coin->get_history_kline($symbol, '1min', 63);
         $klineList = $klineRes->data;
@@ -116,8 +114,10 @@ class EthusdtCommand
         $preEma = prev($emaList);
         if ($currentEma['ema3'] > $currentEma['ema6'] && $currentEma['ema6'] > $currentEma['ema9'] && $currentEma['ema9'] > $currentEma['ema36'] && $currentKline->high == $currentKline->close && $highest == $currentKline->close) {
             $type = 'sell';
+            $orderNum = 6;
         } elseif ($currentEma['ema3'] < $currentEma['ema6'] && $currentEma['ema6'] < $currentEma['ema9'] && $currentEma['ema9'] < $currentEma['ema36'] && $currentKline->low == $currentKline->close && $lowest == $currentKline->close) {
             $type = 'buy';
+            $orderNum = 9;
         } else {
             return;
         }

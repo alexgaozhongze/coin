@@ -12,6 +12,11 @@ return [
         'usage'   => "\tethusdt",
     ],
 
+    'btcusdt' => [
+        \App\Console\Commands\BtcusdtCommand::class,
+        'usage'   => "\tbtcusdt",
+    ],
+
     'usdt' => [
         \App\Console\Commands\UsdtCommand::class,
         'usage'   => "\tUsdt",
