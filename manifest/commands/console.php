@@ -2,6 +2,11 @@
 
 return [
 
+    'g' => [
+        \App\Console\Commands\GobeyondCommand::class,
+        'usage'   => "\tgobeyond",
+    ],
+
     'htusdt' => [
         \App\Console\Commands\HtusdtCommand::class,
         'usage'   => "\thtusdt",

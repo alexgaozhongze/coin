@@ -30,10 +30,19 @@ class BuyCommand
         });
 
         xgo(function () use ($ticker) {
+            $coin = new CoinModel();
+            $balanceList = $coin->get_balance();
+            foreach ($balanceList->data->list as $value) {
+                if ('usdt' == $value->currency && 'trade' == $value->type) {
+                    $balance = $value->balance;
+                    break;
+                }
+            }
+
             while (true) {
                 $ts = $ticker->channel()->pop();
                 if (!$ts) return;
-    
+                
                 $redis = context()->get('redis');
                 $symbols = $redis->get('symbol:usdt');
     
@@ -44,7 +53,7 @@ class BuyCommand
 
                 $chan = new Channel();
                 foreach ($symbols as $symbol) {
-                    xgo([$this, 'handle'], $chan, $symbol);
+                    xgo([$this, 'handle'], $chan, $symbol, $balance);
                 }
         
                 foreach ($symbols as $symbol) {
@@ -54,9 +63,10 @@ class BuyCommand
         });
     }
 
-    public function handle(Channel $chan, $symbol)
+    public function handle(Channel $chan, $symbol, $balance)
     {
-        $orderNum = 63;
+        $orderNum = bcdiv($balance, 9);
+        // $orderNum = 63;
 
         $coin = new CoinModel();
         $klineRes = $coin->get_history_kline($symbol, '1min', 63);
@@ -69,7 +79,7 @@ class BuyCommand
                 $conn = null;
                 goto chanPush;
             }
-            $redis->expire("buy:symbol:$symbol", 666666);
+            $redis->expire("buy:symbol:$symbol", 999);
             $conn = $redis->borrow();
             $conn = null;
 
@@ -106,7 +116,7 @@ class BuyCommand
         }
 
         $currentEma = end($emaList);
-        if (1.01 > $currentEma['ema3'] / $currentKline->close || $low == $currentKline->low) goto chanPush;
+        if (1.01 > $currentEma['ema3'] / $currentKline->close || $low == $currentKline->low || $currentKline->close != $currentKline->low) goto chanPush;
         if ($currentKline->low >= $currentEma['ema36']) goto chanPush;
         unset($klineRes, $klineList, $emaList);
 
@@ -116,13 +126,14 @@ class BuyCommand
             $conn = null;
             goto chanPush;
         }
-        $redis->expire("buy:symbol:$symbol", 666);
+        $redis->expire("buy:symbol:$symbol", 36);
 
         $symbolInfo = $redis->hget('symbol', $symbol);
         $symbolInfo = unserialize($symbolInfo);
 
         $buyPrice = $currentKline->close;
         $sellPrice = $currentKline->high;
+        1.02 > $sellPrice / $buyPrice && $sellPrice = $buyPrice * 1.02;
         list($int, $float) = explode('.', $buyPrice);
         $float = substr($float, 0, $symbolInfo['price-precision']);
         $price = "$int.$float";

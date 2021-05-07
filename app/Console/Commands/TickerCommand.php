@@ -28,6 +28,7 @@ class TickerCommand
         foreach ($data['data'] as $value) {
             if (in_array($value['symbol'], ['lbausdt'])) continue;
             if (!$value['high'] || !$value['low'] || !$value['open'] || !$value['close']) continue;
+            if ($value['close'] <= $value['open']) continue;
             if (1.11 > $value['high'] / $value['low']) continue;
             if (1.98 < $value['close'] / $value['open']) continue;
             if (!$value['count']) continue;
