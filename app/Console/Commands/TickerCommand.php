@@ -13,6 +13,25 @@ class TickerCommand
 {
 
     /**
+     * @var Redis
+     */
+    public $redis;
+
+    /**
+     * @var Connection
+     */
+    public $conn;
+
+    /**
+     * CoroutinePoolDaemonCommand constructor.
+     */
+    public function __construct()
+    {
+        $this->redis = context()->get('redis');
+        $this->conn  = $this->redis->borrow();
+    }
+
+    /**
      * 主函数
      */
     public function main()
@@ -30,12 +49,17 @@ class TickerCommand
             if (!$value['high'] || !$value['low'] || !$value['open'] || !$value['close']) continue;
             if ($value['close'] <= $value['open']) continue;
             if (1.11 > $value['high'] / $value['low']) continue;
-            if (1.98 < $value['close'] / $value['open']) continue;
+            if (1.98 < $value['close'] / $value['open']) {
+                $this->conn->setex("out:$value[symbol]", 172800, NULL);
+                continue;
+            }
             if (!$value['count']) continue;
 
             $pattern = '/.*?([\d])[l|s].*?$/';
             preg_match($pattern, $value['symbol'], $matches);
             if ($matches) continue;
+
+            if (0 < $this->conn->ttl("out:$value[symbol]")) continue;
 
             'usdt' == substr($value['symbol'], -4, 4) && $usdt[] = [
                 'symbol' => $value['symbol'],

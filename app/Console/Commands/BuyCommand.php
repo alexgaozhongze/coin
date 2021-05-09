@@ -70,6 +70,10 @@ class BuyCommand
 
         $coin = new CoinModel();
         $klineRes = $coin->get_history_kline($symbol, '1min', 63);
+        if (!isset($klineRes->data)) {
+            echo $klineRes->{"err-msg"}, ' ', date('H:i:s', strtotime("+8 hours")), PHP_EOL;
+            goto chanPush;
+        }
         $klineList = $klineRes->data;
 
         if (6 >= count($klineList)) {
