@@ -50,7 +50,7 @@ class TickerCommand
             if ($value['close'] <= $value['open']) continue;
             if (1.11 > $value['high'] / $value['low']) continue;
             if (1.98 < $value['close'] / $value['open']) {
-                $this->conn->setex("out:$value[symbol]", 172800, NULL);
+                $this->conn->setex("out:$value[symbol]", 333333, NULL);
                 continue;
             }
             if (!$value['count']) continue;
