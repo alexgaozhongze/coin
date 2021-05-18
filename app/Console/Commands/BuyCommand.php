@@ -29,7 +29,7 @@ class BuyCommand
             return;
         });
 
-        xgo(function () use ($ticker) {
+        xgo(function () use ($ticker, $notify) {
             $coin = new CoinModel();
             $balanceList = $coin->get_balance();
             foreach ($balanceList->data->list as $value) {
@@ -44,8 +44,14 @@ class BuyCommand
                 if (!$ts) return;
                 
                 $redis = context()->get('redis');
+
+                $btcUp = $redis->get('up:btcusdt');
+                if (0.96 > $btcUp || 63 > $balance) {
+                    $ticker->stop();
+                    $notify->stop();
+                }
+
                 $symbols = $redis->get('symbol:usdt');
-    
                 $conn = $redis->borrow();
                 $conn = null;
     
@@ -60,6 +66,8 @@ class BuyCommand
                     $chan->pop(6);
                 }
             }
+
+            return;
         });
     }
 

@@ -36,8 +36,6 @@ class TickerCommand
      */
     public function main()
     {
-        sleep(36);
-
         $client = new Client();
         $response = $client->get("https://api.huobi.pro/market/tickers")->getBody();
 
@@ -45,6 +43,10 @@ class TickerCommand
         $usdt = [];
         $data = json_decode($response, true);
         foreach ($data['data'] as $value) {
+            if ('btcusdt' == $value['symbol']) {
+                $up = $value['close'] / $value['open'];
+                $this->conn->set('up:btcusdt', $up);
+            }
             if (in_array($value['symbol'], ['lbausdt'])) continue;
             if (!$value['high'] || !$value['low'] || !$value['open'] || !$value['close']) continue;
             if ($value['close'] <= $value['open']) continue;
