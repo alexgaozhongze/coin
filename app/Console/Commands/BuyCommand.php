@@ -49,6 +49,7 @@ class BuyCommand
                 if (0.96 > $btcUp || 63 > $balance) {
                     $ticker->stop();
                     $notify->stop();
+                    return;
                 }
 
                 $symbols = $redis->get('symbol:usdt');

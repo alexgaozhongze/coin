@@ -47,7 +47,7 @@ class TickerCommand
                 $up = $value['close'] / $value['open'];
                 $this->conn->set('up:btcusdt', $up);
             }
-            if (in_array($value['symbol'], ['lbausdt'])) continue;
+            if (in_array($value['symbol'], ['lbausdt', 'wbtcusdt'])) continue;
             if (!$value['high'] || !$value['low'] || !$value['open'] || !$value['close']) continue;
             if ($value['close'] <= $value['open']) continue;
             if (1.11 > $value['high'] / $value['low']) continue;
