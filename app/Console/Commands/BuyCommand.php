@@ -183,7 +183,8 @@ class BuyCommand
                 $orderInfo = $order->data;
                 $cancelRes = $coin->cancel_order($orderId);
                 if (in_array($orderInfo->state, ['filled', 'partial-filled'])) {
-                    $amount = $orderInfo->{"field-amount"} - $orderInfo->{"field-fees"};
+                    // $amount = $orderInfo->{"field-amount"} - $orderInfo->{"field-fees"};
+                    $amount = $orderInfo->{"field-amount"};
 
                     list($int, $float) = explode('.', $amount);
                     $float = substr($float, 0, $symbolInfo['amount-precision']);
